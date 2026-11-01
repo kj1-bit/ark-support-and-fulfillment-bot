@@ -1,0 +1,918 @@
+[
+    {
+        "page":  "Acrocanthosaurus",
+        "name":  "Acrocanthosaurus",
+        "asa":  "2026-04-01",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Acrocanthosaurus_Character_BP_C"
+    },
+    {
+        "page":  "Amargasaurus",
+        "name":  "Amargasaurus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Amargasaurus_Character_BP_C"
+    },
+    {
+        "page":  "Andrewsarchus",
+        "name":  "Andrewsarchus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Andrewsarchus_Character_BP_C"
+    },
+    {
+        "page":  "Archelon",
+        "name":  "Archelon",
+        "asa":  "2024-10-16",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Archelon_Character_BP_ASA_C"
+    },
+    {
+        "page":  "Armadoggo",
+        "name":  "Armadoggo",
+        "asa":  "2024-12-20",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "Doggo_Character_BP_C"
+    },
+    {
+        "page":  "Astrocetus",
+        "name":  "Astrocetus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "SpaceWhale_Character_BP_C"
+    },
+    {
+        "page":  "Astrodelphis",
+        "name":  "Astrodelphis",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "SpaceDolphin_Character_BP_C"
+    },
+    {
+        "page":  "Aureliax",
+        "name":  "Aureliax",
+        "asa":  "2025-12-19",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "SnowDragon_Character_BP_C"
+    },
+    {
+        "page":  "Basilisk",
+        "name":  "Basilisk",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Basilisk_Character_BP_C"
+    },
+    {
+        "page":  "Bison",
+        "name":  "Bison",
+        "asa":  "2025-06-20",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Bison_Character_BP_C"
+    },
+    {
+        "page":  "Bloodstalker",
+        "name":  "Bloodstalker",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "BogSpider_Character_BP_C"
+    },
+    {
+        "page":  "Boaratos",
+        "name":  "Boaratos",
+        "asa":  "2026-08-27",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Boaratos_Character_BP_C"
+    },
+    {
+        "page":  "Bulbdog",
+        "name":  "Bulbdog",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "LanternPug_Character_BP_C"
+    },
+    {
+        "page":  "Burrowbuck",
+        "name":  "Burrowbuck",
+        "asa":  "2026-05-20",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Jackalope_Character_BP_C"
+    },
+    {
+        "page":  "Cat",
+        "name":  "Cat",
+        "asa":  "2025-04-01",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "Cat_Character_BP_C"
+    },
+    {
+        "page":  "Ceratosaurus",
+        "name":  "Ceratosaurus",
+        "asa":  "2024-05-17",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Ceratosaurus_Character_BP_ASA_C"
+    },
+    {
+        "page":  "Cerberax",
+        "name":  "Cerberax",
+        "asa":  "2026-09-30",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Cerberus_Character_BP_C"
+    },
+    {
+        "page":  "Concavenator",
+        "name":  "Concavenator",
+        "asa":  "2026-08-27",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Concavenator_Character_BP_C"
+    },
+    {
+        "page":  "Cosmo",
+        "name":  "Cosmo",
+        "asa":  "2024-09-05",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "JumpingSpider_Character_BP_C"
+    },
+    {
+        "page":  "Cryolophosaurus",
+        "name":  "Cryolophosaurus",
+        "asa":  "2025-12-19",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Cryolophosaurus_Character_BP_C"
+    },
+    {
+        "page":  "Crystal Wyvern",
+        "name":  "Crystal Wyvern",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "CrystalWyvern_Character_BP_C"
+    },
+    {
+        "page":  "Dakosaurus",
+        "name":  "Dakosaurus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Dakosaurus_Character_BP_C"
+    },
+    {
+        "page":  "Deinonychus",
+        "name":  "Deinonychus",
+        "asa":  "",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Deinonychus_Character_BP_C"
+    },
+    {
+        "page":  "Deinosuchus",
+        "name":  "Deinosuchus",
+        "asa":  "2024-07-17",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "DeinosuchusASA_Character_BP_C"
+    },
+    {
+        "page":  "Deinotherium",
+        "name":  "Deinotherium",
+        "asa":  "2025-03-27",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "DeinotheriumASA_Character_BP_C"
+    },
+    {
+        "page":  "Desmodus",
+        "name":  "Desmodus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Desmodus_Character_BP_C"
+    },
+    {
+        "page":  "Dinopithecus",
+        "name":  "Dinopithecus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Dinopithecus_Character_BP_C"
+    },
+    {
+        "page":  "Dire Polar Bear",
+        "name":  "Dire Polar Bear",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Polar_Bear_C"
+    },
+    {
+        "page":  "Drakeling",
+        "name":  "Drakeling",
+        "asa":  "2025-06-20",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "ShoulderDragon_Character_BP_C"
+    },
+    {
+        "page":  "Dreadmare",
+        "name":  "Dreadmare",
+        "asa":  "2024-10-31",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "DarkPegasus_Character_BP_C"
+    },
+    {
+        "page":  "Dreadnoughtus",
+        "name":  "Dreadnoughtus",
+        "asa":  "2024-12-20",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Dreadnoughtus_Character_BP_C"
+    },
+    {
+        "page":  "Elderclaw",
+        "name":  "Elderclaw",
+        "asa":  "2025-10-07",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "SpiritBear_Character_BP_C"
+    },
+    {
+        "page":  "Fasolasuchus",
+        "name":  "Fasolasuchus",
+        "asa":  "2024-03-29",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Fasola_Character_BP_C"
+    },
+    {
+        "page":  "Featherlight",
+        "name":  "Featherlight",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "LanternBird_Character_BP_C"
+    },
+    {
+        "name":  "Fenrir",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "0",
+        "entityId":  "Fenrir_Character_BP_C",
+        "acquisition":  "Boss reward"
+    },
+    {
+        "page":  "Ferox",
+        "name":  "Ferox",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Shapeshifter_Small_Character_BP_C"
+    },
+    {
+        "page":  "Fjordhawk",
+        "name":  "Fjordhawk",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "Fjordhawk_Character_BP_C"
+    },
+    {
+        "page":  "Gacha",
+        "name":  "Gacha",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Gacha_Character_BP_C"
+    },
+    {
+        "page":  "Gargantar",
+        "name":  "Gargantar",
+        "asa":  "2026-09-30",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Gargantar_Character_BP_C"
+    },
+    {
+        "page":  "Gasbags",
+        "name":  "Gasbags",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "GasBags_Character_BP_C"
+    },
+    {
+        "page":  "Gigadesmodus",
+        "name":  "Gigadesmodus",
+        "asa":  "2025-12-19",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "BossBat_Character_BP_C"
+    },
+    {
+        "page":  "Gigantoraptor",
+        "name":  "Gigantoraptor",
+        "asa":  "2024-02-28",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Gigantoraptor_Character_BP_C"
+    },
+    {
+        "page":  "Gloon",
+        "name":  "Gloon",
+        "asa":  "2025-12-19",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "LostCharge_LanternPet_Char_BP_C"
+    },
+    {
+        "page":  "Glowtail",
+        "name":  "Glowtail",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "LanternLizard_Character_BP_C"
+    },
+    {
+        "page":  "Grand Tortugar",
+        "name":  "Grand Tortugar",
+        "asa":  "2026-02-25",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "GrandTortugar_Character_BP_C"
+    },
+    {
+        "page":  "Griffin",
+        "name":  "Griffin",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Griffin_Character_BP_C"
+    },
+    {
+        "page":  "Helicoprion",
+        "name":  "Helicoprion",
+        "asa":  "2025-08-29",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Helicoprion_Character_BP_C"
+    },
+    {
+        "page":  "Homarus",
+        "name":  "Homarus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Homarus_Character_BP_C"
+    },
+    {
+        "page":  "Jerboa",
+        "name":  "Jerboa",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "Jerboa_Character_BP_C"
+    },
+    {
+        "page":  "Karkinos",
+        "name":  "Karkinos",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Crab_Character_BP_C"
+    },
+    {
+        "page":  "Kathreptis",
+        "name":  "Kathreptis",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Kathreptis_Character_BP_C"
+    },
+    {
+        "page":  "Lumina",
+        "name":  "Lumina",
+        "asa":  "2026-07-09",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Lumina_Character_BP_C"
+    },
+    {
+        "page":  "Lymantria",
+        "name":  "Lymantria",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Moth_Character_BP_C"
+    },
+    {
+        "page":  "Maeguana",
+        "name":  "Maeguana",
+        "asa":  "2025-02-14",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Maelizard_Character_BP_C"
+    },
+    {
+        "page":  "Maewing",
+        "name":  "Maewing",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "MilkGlider_Character_BP_C"
+    },
+    {
+        "page":  "Magmasaur",
+        "name":  "Magmasaur",
+        "asa":  "",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Cherufe_Character_BP_C"
+    },
+    {
+        "page":  "Malleocephalus",
+        "name":  "Malleocephalus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Malleocephalus_Character_BP_C"
+    },
+    {
+        "page":  "Managarmr",
+        "name":  "Managarmr",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "IceJumper_Character_BP_C"
+    },
+    {
+        "page":  "Mantis",
+        "name":  "Mantis",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Mantis_Character_BP_C"
+    },
+    {
+        "page":  "Mantis Shrimp",
+        "name":  "Mantis Shrimp",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "MantisShrimp_Character_BP_C"
+    },
+    {
+        "page":  "Megachelon",
+        "name":  "Megachelon",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "GiantTurtle_Character_BP_C"
+    },
+    {
+        "page":  "Megaraptor",
+        "name":  "Megaraptor",
+        "asa":  "2025-10-07",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "ValMegaraptor_Character_BP_C"
+    },
+    {
+        "page":  "Monodon",
+        "name":  "Monodon",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Monodon_Character_BP_C"
+    },
+    {
+        "page":  "Morellatops",
+        "name":  "Morellatops",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "camelsaurus_Character_BP_C"
+    },
+    {
+        "page":  "Mudpuppy",
+        "name":  "Mudpuppy",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "Mudpuppy_Character_BP_C"
+    },
+    {
+        "page":  "Oasisaur",
+        "name":  "Oasisaur",
+        "asa":  "2024-04-01",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "0",
+        "entityId":  "Oasisaur_Character_BP_C"
+    },
+    {
+        "page":  "Ocepechelon",
+        "name":  "Ocepechelon",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Ocepechelon_Character_BP_C"
+    },
+    {
+        "page":  "Onchopristis",
+        "name":  "Onchopristis",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Onchopristis_Character_BP_C"
+    },
+    {
+        "page":  "Ossidon",
+        "name":  "Ossidon",
+        "asa":  "2025-11-18",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "SnowMonster_Character_BP_C"
+    },
+    {
+        "page":  "Palaeoctopus",
+        "name":  "Palaeoctopus",
+        "asa":  "2026-07-03",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Palaeoctopus_Character_BP_C"
+    },
+    {
+        "page":  "Parrot",
+        "name":  "Parrot",
+        "asa":  "2026-07-03",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "Parrot_Character_BP_C"
+    },
+    {
+        "page":  "Phoenix",
+        "name":  "Phoenix",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Phoenix_Character_BP_C"
+    },
+    {
+        "page":  "Ravager",
+        "name":  "Ravager",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "CaveWolf_Character_BP_C"
+    },
+    {
+        "page":  "Reaper King",
+        "name":  "Reaper King",
+        "asa":  "",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Xenomorph_Character_BP_Male_Tamed_C"
+    },
+    {
+        "name":  "Rhyniognatha",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "0",
+        "entityId":  "Rhynio_Character_BP_C",
+        "acquisition":  "Impregnation and birth"
+    },
+    {
+        "page":  "Rock Drake",
+        "name":  "Rock Drake",
+        "asa":  "",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "RockDrake_Character_BP_C"
+    },
+    {
+        "page":  "Roll Rat",
+        "name":  "Roll Rat",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "MoleRat_Character_BP_C"
+    },
+    {
+        "page":  "Seahorse",
+        "name":  "Seahorse",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Seahorse_Character_BP_C"
+    },
+    {
+        "page":  "Shadowmane",
+        "name":  "Shadowmane",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "LionfishLion_Character_BP_C"
+    },
+    {
+        "page":  "Shastasaurus",
+        "name":  "Shastasaurus",
+        "asa":  "2024-06-04",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Shastasaurus_Character_BP_C"
+    },
+    {
+        "page":  "Shinehorn",
+        "name":  "Shinehorn",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "LanternGoat_Character_BP_C"
+    },
+    {
+        "page":  "Sinomacrops",
+        "name":  "Sinomacrops",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "Sinomacrops_Character_BP_C"
+    },
+    {
+        "page":  "Snow Owl",
+        "name":  "Snow Owl",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Owl_Character_BP_C"
+    },
+    {
+        "page":  "Solwyn",
+        "name":  "Solwyn",
+        "asa":  "2025-12-19",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "AngelFox_Character_BP_C"
+    },
+    {
+        "page":  "Tek Parasaur",
+        "name":  "Tek Parasaur",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "BionicPara_Character_BP_C"
+    },
+    {
+        "page":  "Tek Quetzal",
+        "name":  "Tek Quetzal",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "BionicQuetz_Character_BP_C"
+    },
+    {
+        "page":  "Tek Raptor",
+        "name":  "Tek Raptor",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "BionicRaptor_Character_BP_C"
+    },
+    {
+        "page":  "Tek Stegosaurus",
+        "name":  "Tek Stegosaurus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "BionicStego_Character_BP_C"
+    },
+    {
+        "page":  "Tek Triceratops",
+        "name":  "Tek Triceratops",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "BionicTrike_Character_BP_C"
+    },
+    {
+        "page":  "Therizinosaur",
+        "name":  "Therizinosaur",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Therizino_Character_BP_C"
+    },
+    {
+        "page":  "Thorny Dragon",
+        "name":  "Thorny Dragon",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "SpineyLizard_Character_BP_C"
+    },
+    {
+        "page":  "Tidepup",
+        "name":  "Tidepup",
+        "asa":  "2026-07-03",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Axolotl_Character_BP_C"
+    },
+    {
+        "page":  "Tiktaalik",
+        "name":  "Tiktaalik",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Tiktaalik_Character_BP_C"
+    },
+    {
+        "page":  "Tropeognathus",
+        "name":  "Tropeognathus",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Tropeognathus_Character_BP_C"
+    },
+    {
+        "page":  "Umbra",
+        "name":  "Umbra",
+        "asa":  "2026-07-04",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Umbra_Character_BP_C"
+    },
+    {
+        "page":  "Veilwyn",
+        "name":  "Veilwyn",
+        "asa":  "2025-06-20",
+        "tameable":  "1",
+        "rideable":  "0",
+        "breedable":  "1",
+        "entityId":  "YoungIceFox_DinoCompanion_Character_BP_C"
+    },
+    {
+        "page":  "Velonasaur",
+        "name":  "Velonasaur",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Spindles_Character_BP_C"
+    },
+    {
+        "page":  "Voidwyrm",
+        "name":  "Voidwyrm",
+        "asa":  "",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "TekWyvern_Character_BP_C"
+    },
+    {
+        "page":  "Vulcanite",
+        "name":  "Vulcanite",
+        "asa":  "",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Vulcanite_Character_BP_C"
+    },
+    {
+        "page":  "Wyvern",
+        "name":  "Wyvern",
+        "asa":  "",
+        "tameable":  "0",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Wyvern_Character_BP_Base_C"
+    },
+    {
+        "page":  "Xiphactinus",
+        "name":  "Xiphactinus",
+        "asa":  "2024-05-17",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "Xiphactinus_Character_BP_ASA_C"
+    },
+    {
+        "page":  "Yi Ling",
+        "name":  "Yi Ling",
+        "asa":  "2024-09-05",
+        "tameable":  "1",
+        "rideable":  "1",
+        "breedable":  "1",
+        "entityId":  "YiLing_Character_BP_C"
+    }
+]

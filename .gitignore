@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Runtime databases and backups
+database.sqlite
+database-*.sqlite
+*.sqlite
+*.sqlite3
+*.sqlite-backup
+*.sqlite.backup-*
+
+# Process manager and logs
+.pm2/
+*.log
+logs/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Coverage and temporary files
+coverage/
+tmp/
+temp/
+*.tmp
+
+# Deployment backups
+index.js.backup-*
+deploy-commands.js.backup-*

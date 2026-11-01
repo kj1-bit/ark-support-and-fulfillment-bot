@@ -1,0 +1,4 @@
+PackageName,EntryCost,Dino1Level,Dino1GenderIndex,Dino1Blueprint,Dino2Level,Dino2GenderIndex,Dino2Blueprint,IncludedItems
+Example Rex Pair,100,150,0,/Game/PrimalEarth/Dinos/Rex/Rex_Character_BP.Rex_Character_BP_C,150,1,/Game/PrimalEarth/Dinos/Rex/Rex_Character_BP.Rex_Character_BP_C,/Game/PrimalEarth/CoreBlueprints/Items/Armor/Saddles/PrimalItemArmor_RexSaddle.PrimalItemArmor_RexSaddle_C
+Example Dodo Pair,25,150,0,/Game/PrimalEarth/Dinos/Dodo/Dodo_Character_BP.Dodo_Character_BP_C,150,1,/Game/PrimalEarth/Dinos/Dodo/Dodo_Character_BP.Dodo_Character_BP_C,
+Example Argentavis Pair,75,150,0,/Game/PrimalEarth/Dinos/Argentavis/Argent_Character_BP.Argent_Character_BP_C,150,1,/Game/PrimalEarth/Dinos/Argentavis/Argent_Character_BP.Argent_Character_BP_C,/Game/PrimalEarth/CoreBlueprints/Items/Armor/Saddles/PrimalItemArmor_ArgentavisSaddle.PrimalItemArmor_ArgentavisSaddle_C

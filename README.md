@@ -52,6 +52,42 @@ node deploy-commands.js
 node index.js
 ```
 
+## Required and supported ARK mods
+
+### Shop catalog
+
+The CSV-backed shop catalog and Discord shop-search feature are designed
+to document packages configured through
+[Resonant's Shop Mod](https://www.curseforge.com/ark-survival-ascended/mods/resonants-shop-mod).
+
+Resonant's Shop Mod allows server administrators to create purchasable
+packages containing creatures and items. Players access its in-game shop
+interface with F1. Ticketbot does not create or manage these packages.
+It imports a separately maintained CSV representation so players and
+staff can search the configured shop through Discord.
+
+The example `data/shop-catalog.csv` file contains demonstration data and
+must be replaced with catalog data appropriate for the server using the
+bot.
+
+### Automated dino fulfillment
+
+The feature that spawns creatures in cryopods directly into a selected
+online player's inventory has only been developed and tested on servers
+with [Awesome ARK Tools](https://www.curseforge.com/ark-survival-ascended/mods/awesome-admin-tools) installed.
+
+Ticketbot uses Awesome ARK Tools script commands through RCON to create
+the configured creature, apply the fixed fulfillment settings, place it
+in a cryopod, and target the selected player's EOS ID.
+
+This project does not claim that automated fulfillment will work without
+Awesome ARK Tools or with a different admin-tools mod. Test the complete
+workflow on a non-production server with `ARK_RCON_MOCK=true` before
+enabling live delivery.
+
+These mods are separate third-party projects and are not included in or
+licensed by this repository.
+
 ## Security
 
 Never commit the following:

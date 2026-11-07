@@ -91,8 +91,8 @@ A task is not complete merely because it works during one manual Discord or RCON
 - [x] Create the `rebuild/v2-foundation` branch.
 - [x] Install and validate the current dependency set.
 - [x] Review and approve the pinned SQLite install script.
-- [ ] Confirm the private V1 backup and integrity evidence.
-- [ ] Confirm the V1 baseline tag and rollback reference.
+- [x] Confirm the private V1 backup and integrity evidence.
+- [x] Confirm the V1 baseline tag and rollback reference.
 - [ ] Record the public and private repository boundary.
 - [ ] Inventory tracked, ignored, generated, and runtime-only files.
 - [ ] Inventory configuration fields without exposing secret values.
@@ -102,6 +102,8 @@ Exit criteria:
 
 - A known-good V1 rollback point exists.
 - Backup integrity has been verified.
+- The private V1 repository and remote baseline tag resolve to the same tagged commit.
+- Two encrypted Windows archive copies exist and match their recorded SHA-256 value.
 - V2 work cannot accidentally overwrite the V1 baseline.
 - The public/private repository boundary is documented.
 
@@ -396,10 +398,10 @@ A creature catalog update is acceptable only when:
 
 - Date: 2026-11-05
 - Branch: `rebuild/v2-foundation`
-- Last committed commit: `bc43c6c` (`Add Ticketbot V2 threat model`)
+- Last committed commit: `74bed7a` (`Add Ticketbot V2 architecture and catalog roadmap`)
 - Milestone: V2 foundation and documentation
-- Current task: Finalize the roadmap and architecture checkpoint before making production-behavior changes.
-- Status: In progress; paused at a cleanly identified uncommitted documentation checkpoint.
+- Current task: Record the verified private V1 baseline and encrypted backup evidence, then complete the repository-boundary and configuration inventories before making production-behavior changes.
+- Status: In progress; architecture and catalog-roadmap documentation are committed and pushed, and private V1 baseline verification has passed.
 
 ### Completed work
 
@@ -420,6 +422,12 @@ A creature catalog update is acceptable only when:
 - Created and validated `docs/V2_ARCHITECTURE.md` locally.
 - Mapped threat categories T01 through T14 to explicit modules, interfaces, dependency rules, tests, migration stages, and release controls.
 - Added the requirement for an independently updatable, validated, versioned creature spawning catalog with change review, atomic activation, audit tracking, backup, and rollback.
+- Committed and pushed `docs/V2_ARCHITECTURE.md` and the expanded catalog roadmap as `74bed7a`.
+- Verified the private V1 repository is clean and synchronized on `main`.
+- Verified local `HEAD`, `origin/main`, the local `v1-private-baseline` tag, and the remote peeled tag all resolve to `a52558e83b81a6710848c16c03acb0509cdb4583`.
+- Confirmed the encrypted V1 archive had previously been opened successfully with its password.
+- Confirmed encrypted V1 archive copies exist locally and in OneDrive.
+- Confirmed both encrypted archive copies are 42,770 bytes and match SHA-256 `A1DE4A9E5B2034184E4FB47E539C3997771F3B36C6DE20539D5DD005C986CDD4`.
 
 ### Tests and verification completed
 
@@ -437,12 +445,10 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 
 ### Known failures and gaps
 
-- `docs/V2_ARCHITECTURE.md` has been created and validated locally but is not yet committed or pushed.
-- This replacement `docs/V2_ROADMAP.md` must be copied into the repository, validated, staged, committed, and pushed with the architecture document.
-- The private V1 backup, baseline tag, and integrity evidence still require documentation or verification in the public roadmap checkpoint.
 - The tracked, ignored, generated, and runtime-only file inventory remains incomplete.
 - The configuration-field inventory remains incomplete.
 - The public/private repository boundary still requires a dedicated recorded verification step.
+- The formal rollback procedure and rehearsal evidence still require completion or verification.
 - GitHub milestones, issues, and project-board state still require creation or verification.
 - No production behavior has been changed on this branch.
 
@@ -461,12 +467,11 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 ### Files expected to change in the next commit
 
 - `docs/V2_ROADMAP.md`
-- `docs/V2_ARCHITECTURE.md`
 
 ### Next exact step
 
-Copy this replacement file over `docs/V2_ROADMAP.md`. Validate the roadmap and architecture documents, stage both files, inspect the staged diff, commit them together, and push the branch. Then verify the private V1 backup, baseline tag, repository boundary, and configuration inventory before making production-behavior changes.
+Copy this replacement file over `docs/V2_ROADMAP.md`, validate it, commit and push the verified-baseline checkpoint, then inventory the public/private repository boundary and configuration fields before making production-behavior changes.
 
 ### Rollback point
 
-Reset only the uncommitted documentation work back to committed state `bc43c6c` if the roadmap or architecture validation fails. Do not use destructive reset or cleanup commands without first reviewing the affected files.
+The current committed rollback point is `74bed7a`. If this roadmap-only checkpoint fails validation, restore only `docs/V2_ROADMAP.md` from `74bed7a` after reviewing the diff. Do not use destructive reset or cleanup commands without first reviewing the affected files.

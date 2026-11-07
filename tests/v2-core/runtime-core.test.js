@@ -55,7 +55,7 @@ test('empty fulfillment results fail closed without reporting success',async()=>
     uuid:()=>'00000000-0000-4000-8000-000000000001'
   });
 
-  const pending=service.createPending({
+  const pending=await service.createPending({
     context,
     creatureId:'rex',
     serverId:'map-one',

@@ -1,0 +1,2 @@
+'use strict';
+module.exports=Object.freeze({version:6,name:'operational-events',statements:Object.freeze([`CREATE TABLE IF NOT EXISTS operational_events (id INTEGER PRIMARY KEY AUTOINCREMENT,type TEXT NOT NULL,category TEXT NOT NULL,occurred_at INTEGER NOT NULL,details_json TEXT NOT NULL CHECK(length(details_json)<=4096))`,`CREATE INDEX IF NOT EXISTS idx_operational_events_category_time ON operational_events(category,occurred_at DESC,id DESC)`,`CREATE INDEX IF NOT EXISTS idx_operational_events_time ON operational_events(occurred_at DESC,id DESC)`])});

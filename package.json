@@ -1,25 +1,28 @@
 {
-  "name": "player-support-bot",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "node --test tests/config/*.test.js tests/bootstrap/*.test.js",
-    "test:config": "node --test tests/config/*.test.js",
-    "config:validate": "node scripts/validate-config.js",
-    "test:bootstrap": "node --test tests/bootstrap/*.test.js"
-  },
-  "keywords": [],
-  "author": "",
-  "dependencies": {
-    "discord.js": "^14.27.0",
-    "dotenv": "^18.0.9",
-    "node-cron": "^4.6.0",
-    "rcon": "^1.1.0",
-    "sqlite3": "^6.0.1"
-  },
-  "license": "CC0-1.0",
-  "allowScripts": {
-    "sqlite3@6.0.1": true
-  }
+    "name":  "player-support-bot",
+    "version":  "1.0.0",
+    "description":  "",
+    "main":  "index.js",
+    "scripts":  {
+                    "test":  "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js",
+                    "test:config":  "node --test tests/config/*.test.js",
+                    "config:validate":  "node scripts/validate-config.js",
+                    "test:bootstrap":  "node --test tests/bootstrap/*.test.js",
+                    "test:security":  "node --test tests/security/*.test.js"
+                },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "dependencies":  {
+                         "discord.js":  "^14.27.0",
+                         "dotenv":  "^18.0.9",
+                         "node-cron":  "^4.6.0",
+                         "rcon":  "^1.1.0",
+                         "sqlite3":  "^6.0.1"
+                     },
+    "license":  "CC0-1.0",
+    "allowScripts":  {
+                         "sqlite3@6.0.1":  true
+                     }
 }

@@ -148,14 +148,14 @@ Exit criteria:
 
 ## Phase 3: Remove dangerous execution paths
 
-- [ ] Remove Discord-triggered shell execution.
-- [ ] Remove or replace `/updatebot`.
-- [ ] Audit all uses of process execution and dynamic command construction.
+- [x] Remove Discord-triggered shell execution.
+- [x] Remove or replace `/updatebot`.
+- [x] Audit all uses of process execution and dynamic command construction.
 - [ ] Restrict RCON to allowlisted operations.
 - [ ] Separate command creation from command transport.
 - [ ] Make raw RCON transport inaccessible to Discord feature handlers.
 - [ ] Add injection and authorization tests.
-- [ ] Document the secure deployment update process.
+- [x] Document the secure deployment update process.
 
 Exit criteria:
 
@@ -397,11 +397,11 @@ A creature catalog update is acceptable only when:
 ## Current checkpoint
 
 - Date: 2026-11-05
-- Branch: `feature/v2-config-foundation`
-- Last committed commit: `9d0d965` (`Enforce V2 configuration before adapter startup`)
+- Branch: `feature/v2-remove-shell-execution`
+- Last committed commit: `21de487` (`Merge pull request #15 from kj1-bit/feature/v2-config-foundation`)
 - Milestone: V2 Secure Core
-- Current task: Complete PR #15 review corrections, rerun all issue #2 verification, and prepare the pull request for merge.
-- Status: Issue #2 implementation and bootstrap ordering are complete. PR #15 is open; the final review correction expands the public schema, adds schema-consistency tests, and refreshes acceptance evidence before merge.
+- Current task: Remove Discord-triggered operating-system execution and document operator-controlled deployment for issue #3.
+- Status: Issue #2 is merged and closed. Issue #3 source removal is applied for local review; production and deployed Discord commands remain unchanged until an approved deployment.
 
 ### Completed work
 
@@ -448,6 +448,16 @@ A creature catalog update is acceptable only when:
 - Proved mock mode does not construct an RCON adapter.
 - Proved the safe configuration summary is emitted before external initialization.
 - Preserved the existing V1 `index.js` startup path without modification.
+- Issue #2 merged through PR #15 at merge commit `21de487` and was closed.
+- Audited operating-system process execution across the repository.
+- Removed the `child_process` import and Discord-triggered `exec()` path.
+- Removed the deployment command from runtime handling and command registration.
+- Removed `UPDATE_SCRIPT_PATH` from public configuration.
+- Removed obsolete deployment guidance from user-facing documentation.
+- Added operator-controlled deployment and rollback documentation.
+- Added static and negative-path shell-execution tests.
+- Verified executable runtime code contains no `child_process`, `exec`, `execFile`, `spawn`, or `fork` path.
+- Verified public configuration and user-facing documentation contain no obsolete deployment command or variable.
 
 ### Tests and verification completed
 
@@ -459,7 +469,10 @@ A creature catalog update is acceptable only when:
 - V1 runtime-file status scan returned no matches.
 - `git diff --check`: passed; LF-to-CRLF notices were informational.
 - PR #15 opened from `feature/v2-config-foundation` into `rebuild/v2-foundation`.
-- Final corrective verification passed with 13 tests and 0 failures.
+- Final corrective verification for issue #2 passed with 13 tests and 0 failures.
+- Issue #3 unified suite passed with 17 tests and 0 failures.
+- Issue #3 security-only suite passed with 4 tests and 0 failures.
+- Runtime and public-documentation prohibition scans returned no unexpected matches.
 ### Known failures and gaps
 
 - The formal rollback procedure is documented; test-environment rehearsal evidence is still required.
@@ -483,12 +496,11 @@ A creature catalog update is acceptable only when:
 
 ### Files expected to change in the next commit
 
-- `config/schemas/instance.schema.json`
-- `tests/config/schema-consistency.test.js`
-- `docs/V2_ROADMAP.md`
+- .env.example`n- index.js`n- deploy-commands.js`n- package.json`n- docs/FEATURES.md`n- docs/SETUP.md`n- docs/V2_DEPLOYMENT.md`n- docs/V2_ROADMAP.md`n- 	ests/security/no-shell-execution.test.js`n
 ### Next exact step
 
-Run the full configuration and bootstrap test suite including schema-consistency tests, validate the public example, inspect PR #15 again, commit and push the review correction, then merge only after the pull request is clean and all evidence is recorded.
+Run the full and security-only test suites, repeat the static process-execution scan, inspect the diff, and review compatibility, private-configuration, deployment, and rollback evidence before staging issue #3.
+
 ### Rollback point
 
-The committed rollback point before this review correction is `9d0d965`. Before commit, restore the schema and roadmap from `9d0d965` and remove `tests/config/schema-consistency.test.js` after reviewing the diff. No production, Discord, RCON, database, or service rollback is required because V1 runtime behavior remains unchanged.
+The committed rollback point is 21de487. Before commit, restore changed tracked files from 21de487 and remove the new deployment document and security test after reviewing the diff. No production, Discord registration, database, or RCON rollback is required because this checkpoint is source-only.

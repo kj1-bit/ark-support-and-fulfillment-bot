@@ -174,7 +174,6 @@ The public example is intentionally blank. Fill in your own values:
 ```env
 DISCORD_TOKEN=
 CLIENT_ID=
-OWNER_ID=
 
 STAFF_ROLE_ID=
 MEMBER_ROLE_ID=
@@ -198,14 +197,12 @@ ARK_RCON_PASSWORD=
 ARK_TEST_RCON_PASSWORD=
 ARK_RCON_MOCK=true
 
-UPDATE_SCRIPT_PATH=
 ```
 
 ### Variable meanings
 
 - `DISCORD_TOKEN`: Secret token used to log in as the bot.
 - `CLIENT_ID`: Discord application ID used when registering slash commands.
-- `OWNER_ID`: Discord user ID allowed to use `/updatebot`.
 - `STAFF_ROLE_ID`: Role allowed to administer tickets, PINs, and the shop catalog.
 - `MEMBER_ROLE_ID`: Community member role used during bulk PIN generation.
 - `CATEGORY_ID`: Parent category where private ticket channels are created.
@@ -221,7 +218,6 @@ UPDATE_SCRIPT_PATH=
 - `ARK_RCON_PORT_1`, `ARK_RCON_PORT_2`, `ARK_TEST_RCON_PORT`: Example RCON ports referenced by `config/ark-servers.js`.
 - `ARK_RCON_PASSWORD`, `ARK_TEST_RCON_PASSWORD`: Passwords read indirectly through each server's `passwordEnv` setting.
 - `ARK_RCON_MOCK`: When `true`, prevents live RCON delivery and uses synthetic online-player data.
-- `UPDATE_SCRIPT_PATH`: Optional local update script executed by `/updatebot`; leave blank to disable automated updates.
 
 ## 8. Configure ARK servers
 
@@ -303,7 +299,6 @@ Registered commands include:
 - `/generateallpins`
 - `/shop-search query:<text>`
 - `/shop-refresh`
-- `/updatebot`
 
 Run the deployment script again whenever the slash-command definitions change.
 
@@ -400,15 +395,11 @@ Back up:
 
 Do not publish backups containing credentials, PINs, player names, ticket history, or EOS IDs.
 
-## 17. Optional `/updatebot`
+## 17. Operator-controlled deployment and rollback
 
-The public version reads the update script from:
+Discord cannot deploy, update, restart, or execute host commands.
 
-```env
-UPDATE_SCRIPT_PATH=
-```
-
-Leave this blank to disable automated updates. If enabled, the script is executed with the bot process's operating-system permissions. Review and secure the script separately. Only the Discord user matching `OWNER_ID` can invoke the command in the application logic.
+Follow `docs/V2_DEPLOYMENT.md` and the installation-specific private operations runbook. During an approved deployment, rerun `node deploy-commands.js` to synchronize the registered Discord commands with the reviewed source.
 
 ## 18. Troubleshooting
 

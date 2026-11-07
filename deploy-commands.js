@@ -50,12 +50,7 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName('shop-refresh')
-    .setDescription('Reload the shop catalog from CSV'),
-  new SlashCommandBuilder()
-  .setName('updatebot')
-  .setDescription(
-    'Pull latest GitHub changes and restart bot'
-  )
+    .setDescription('Reload the shop catalog from CSV')
 
 ].map(command => command.toJSON());
 

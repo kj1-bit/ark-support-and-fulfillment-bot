@@ -1,0 +1,49 @@
+# Ticketbot V2 operator-controlled deployment
+
+Discord interactions must never start deployment, execute operating-system commands, select scripts, or restart the bot. Deployment is an operator-controlled host action performed outside the Discord process.
+
+## Security boundary
+
+- `/updatebot` is removed from command registration and runtime handling.
+- `UPDATE_SCRIPT_PATH` is not supported configuration.
+- Application runtime code must not import `child_process` or invoke `exec`, `execFile`, `spawn`, or `fork`.
+- Discord users, roles, commands, buttons, modals, and message content cannot initiate deployment.
+- Host operators authenticate to the deployment host through an approved administrative channel and follow the private operations runbook.
+
+## Reviewable deployment sequence
+
+The public source repository defines application code, tests, and public documentation. Installation-specific service definitions, non-secret deployment configuration, and the exact host commands belong in the private operations repository. Secrets remain on the host.
+
+Before deploying, the operator should:
+
+1. Record the currently deployed commit and service state.
+2. Back up the runtime database and installation-specific configuration.
+3. Fetch the reviewed source through the host's approved Git workflow.
+4. Verify the intended commit or release.
+5. Install dependencies using the reviewed lockfile and approved install scripts.
+6. Run the complete automated test suite and configuration validation.
+7. Restart through the host service manager.
+8. Verify startup, panels, logs, and mock/test behavior before any live privileged operation.
+9. Record the deployed commit, test evidence, and rollback point.
+
+This document defines the security boundary, not installation-specific commands. Host-specific commands must be versioned in the private operations repository and reviewed separately.
+
+## Rollback
+
+Rollback is also operator-controlled and must not depend on Discord.
+
+1. Stop or isolate the failed service through the host service manager.
+2. Restore the previously recorded known-good application commit or release.
+3. Restore configuration or database backups only when the change affected them.
+4. Reinstall dependencies if the lockfile changed.
+5. Run tests and configuration validation.
+6. Start the service and verify expected behavior.
+7. Record the rollback result.
+
+For this source-only checkpoint, restoring commit `21de487` returns the repository to the state before removal of the Discord shell path. No production service, Discord registration, database, or RCON state is changed merely by merging this source checkpoint.
+
+## Compatibility and migration
+
+Removing `/updatebot` intentionally removes one V1 administrative workflow. All player, ticket, PIN, shop, panel, fulfillment, database, mock-mode, and RCON behaviors remain otherwise unchanged by this checkpoint.
+
+Existing installations must remove `UPDATE_SCRIPT_PATH` from private environment files and rerun `node deploy-commands.js` during a reviewed deployment so Discord's global command registration no longer includes `/updatebot`.

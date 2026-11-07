@@ -17,7 +17,6 @@ const sqlite3 = require('sqlite3').verbose();
 const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
 const { createDinoFulfillmentFeature } = require('./features/dino-fulfillment-panel');
 
 const client = new Client({
@@ -1141,49 +1140,6 @@ client.on('interactionCreate', async interaction => {
         const imported = await importShopCatalog();
         return interaction.editReply({ content: `Reloaded ${imported} shop packages.` });
       }
-      if (interaction.commandName === 'updatebot') {
-        if (interaction.user.id !== process.env.OWNER_ID) {
-          return interaction.reply({
-            content: 'Owner only.',
-            ephemeral: true
-          });
-        }
-
-        await interaction.reply({
-          content: 'Updating bot...',
-          ephemeral: true
-        });
-
-        const updateScript = process.env.UPDATE_SCRIPT_PATH;
-
-        if (!updateScript) {
-          return interaction.reply({
-            content: 'Automated updates are not configured.',
-            ephemeral: true
-          });
-        }
-
-        exec(
-          updateScript,
-          (error, stdout, stderr) => {
-            if (error) {
-              return interaction.followUp({
-                content:
-                  `Update failed:\n\`\`\`\n${stderr || error.message}\n\`\`\``,
-                ephemeral: true
-              }).catch(() => {});
-            }
-
-            return interaction.followUp({
-              content:
-                `Update started successfully.\n\`\`\`\n${stdout}\n\`\`\``,
-              ephemeral: true
-            }).catch(() => {});
-          }
-        );
-        return;
-      }
-
       if (!isStaff(interaction.member)) {
         return interaction.reply({
           content: 'Staff only.',

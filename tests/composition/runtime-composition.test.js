@@ -92,6 +92,7 @@ test('Discord receives narrow services without database or transport',async()=>{
       'playerNames',
       'playerRepository',
       'players',
+      'shop',
       'tickets'
     ]
   );

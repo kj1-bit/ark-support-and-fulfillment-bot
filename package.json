@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js tests/v2-core/*.test.js tests/persistence/*.test.js tests/composition/*.test.js tests/trusted-state/*.test.js tests/persistent-trusted-state/*.test.js tests/persistent-runtime/*.test.js tests/discord-adapter/*.test.js tests/discord-lifecycle/*.test.js tests/feature-contracts/*.test.js tests/feature-integration/*.test.js tests/player-names/*.test.js tests/player-names-runtime/*.test.js tests/tickets/*.test.js",
+    "test": "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js tests/v2-core/*.test.js tests/persistence/*.test.js tests/composition/*.test.js tests/trusted-state/*.test.js tests/persistent-trusted-state/*.test.js tests/persistent-runtime/*.test.js tests/discord-adapter/*.test.js tests/discord-lifecycle/*.test.js tests/feature-contracts/*.test.js tests/feature-integration/*.test.js tests/player-names/*.test.js tests/player-names-runtime/*.test.js tests/tickets/*.test.js tests/ticket-runtime/*.test.js",
     "test:config": "node --test tests/config/*.test.js",
     "config:validate": "node scripts/validate-config.js",
     "test:bootstrap": "node --test tests/bootstrap/*.test.js",
@@ -21,7 +21,8 @@
     "test:feature-integration": "node --test tests/feature-integration/*.test.js",
     "test:player-names": "node --test tests/player-names/*.test.js",
     "test:player-names-runtime": "node --test tests/player-names-runtime/*.test.js",
-    "test:tickets": "node --test tests/tickets/*.test.js"
+    "test:tickets": "node --test tests/tickets/*.test.js",
+    "test:ticket-runtime": "node --test tests/ticket-runtime/*.test.js"
   },
   "keywords": [],
   "author": "",

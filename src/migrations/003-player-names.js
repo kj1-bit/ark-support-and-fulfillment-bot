@@ -1,0 +1,2 @@
+'use strict';
+module.exports=Object.freeze({version:3,name:'player-names',statements:Object.freeze([`CREATE TABLE IF NOT EXISTS player_names (discord_id TEXT PRIMARY KEY, player_name TEXT NOT NULL COLLATE NOCASE UNIQUE, status TEXT NOT NULL CHECK(status IN ('PENDING','VERIFIED')), moderator_id TEXT, verified_at INTEGER, updated_at INTEGER NOT NULL)`,`CREATE INDEX IF NOT EXISTS idx_player_names_status ON player_names(status)`])});

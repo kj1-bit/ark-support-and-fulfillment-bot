@@ -1,0 +1,4 @@
+'use strict';
+const {defineFeature}=require('./feature-contract');
+function createPlayerNamesFeature(){let listener;return defineFeature({name:'player-names',dependencies:[],async initialize(context){if(!context.services?.playerNames)throw new TypeError('playerNames service is required.');},async register(context){listener=async interaction=>{if(interaction.type==='player-name.submit')return interaction.reply(await context.services.playerNames.submit({discordId:interaction.user.id,playerName:interaction.input.playerName}));if(interaction.type==='player-name.verify')return interaction.reply(await context.services.playerNames.verify({discordId:interaction.input.discordId,moderatorId:interaction.user.id}));};context.client.on('interactionCreate',listener);},async start(){},async stop(context){if(listener&&typeof context.client.off==='function')context.client.off('interactionCreate',listener);listener=null;}});}
+module.exports={createPlayerNamesFeature};

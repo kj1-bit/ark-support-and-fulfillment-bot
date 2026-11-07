@@ -93,10 +93,10 @@ A task is not complete merely because it works during one manual Discord or RCON
 - [x] Review and approve the pinned SQLite install script.
 - [x] Confirm the private V1 backup and integrity evidence.
 - [x] Confirm the V1 baseline tag and rollback reference.
-- [ ] Record the public and private repository boundary.
-- [ ] Inventory tracked, ignored, generated, and runtime-only files.
-- [ ] Inventory configuration fields without exposing secret values.
-- [ ] Record current Node.js, npm, Discord, SQLite, RCON, and deployment requirements.
+- [x] Record the public and private repository boundary.
+- [x] Inventory tracked, ignored, generated, and runtime-only files.
+- [x] Inventory configuration fields without exposing secret values.
+- [x] Record current Node.js, npm, Discord, SQLite, RCON, and deployment requirements.
 
 Exit criteria:
 
@@ -117,7 +117,7 @@ Exit criteria:
 - [x] Create and validate `docs/V2_ARCHITECTURE.md` locally.
 - [x] Document the target module boundaries and dependency direction.
 - [x] Map threat categories T01 through T14 to architecture controls.
-- [ ] Commit and push `docs/V2_ARCHITECTURE.md` with this checkpoint update.
+- [x] Commit and push `docs/V2_ARCHITECTURE.md` with this checkpoint update.
 
 Exit criteria:
 
@@ -398,10 +398,10 @@ A creature catalog update is acceptable only when:
 
 - Date: 2026-11-05
 - Branch: `rebuild/v2-foundation`
-- Last committed commit: `74bed7a` (`Add Ticketbot V2 architecture and catalog roadmap`)
+- Last committed commit: `0d7debc` (`Record verified V1 baseline and backups`)
 - Milestone: V2 foundation and documentation
-- Current task: Record the verified private V1 baseline and encrypted backup evidence, then complete the repository-boundary and configuration inventories before making production-behavior changes.
-- Status: In progress; architecture and catalog-roadmap documentation are committed and pushed, and private V1 baseline verification has passed.
+- Current task: Commit the repository-boundary and configuration inventory, then complete rollback documentation and GitHub planning before accelerated V2 foundation implementation.
+- Status: In progress; Phase 0 inventory is documented and Phase 1 architecture documentation is committed. No production behavior has changed.
 
 ### Completed work
 
@@ -428,6 +428,10 @@ A creature catalog update is acceptable only when:
 - Confirmed the encrypted V1 archive had previously been opened successfully with its password.
 - Confirmed encrypted V1 archive copies exist locally and in OneDrive.
 - Confirmed both encrypted archive copies are 42,770 bytes and match SHA-256 `A1DE4A9E5B2034184E4FB47E539C3997771F3B36C6DE20539D5DD005C986CDD4`.
+- Inspected the public repository through GitHub at `0d7debc`.
+- Created `docs/V2_REPOSITORY_BOUNDARY.md` with tracked, ignored, generated, runtime, configuration, catalog, deployment, and migration ownership.
+- Recorded the current configuration-name inventory without including secret values.
+- Recorded the accelerated complete-build approach: generate the coordinated V2 implementation, integrate it through reviewable checkpoints, and require all definition-of-done evidence before production use.
 
 ### Tests and verification completed
 
@@ -445,11 +449,11 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 
 ### Known failures and gaps
 
-- The tracked, ignored, generated, and runtime-only file inventory remains incomplete.
-- The configuration-field inventory remains incomplete.
-- The public/private repository boundary still requires a dedicated recorded verification step.
 - The formal rollback procedure and rehearsal evidence still require completion or verification.
 - GitHub milestones, issues, and project-board state still require creation or verification.
+- Branch protection, CI gates, and public release tags are not yet configured.
+- The private operations repository still requires initialization without duplicated application source.
+- Broad archive and local-backup ignore patterns still require addition before implementation artifacts are introduced.
 - No production behavior has been changed on this branch.
 
 ### Compatibility and security notes
@@ -466,12 +470,13 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 
 ### Files expected to change in the next commit
 
+- `docs/V2_REPOSITORY_BOUNDARY.md`
 - `docs/V2_ROADMAP.md`
 
 ### Next exact step
 
-Copy this replacement file over `docs/V2_ROADMAP.md`, validate it, commit and push the verified-baseline checkpoint, then inventory the public/private repository boundary and configuration fields before making production-behavior changes.
+Copy `docs/V2_REPOSITORY_BOUNDARY.md` and this corrected roadmap into the repository, validate both, commit and push the documentation checkpoint, then create the formal rollback procedure and GitHub planning structure before beginning the accelerated V2 foundation implementation.
 
 ### Rollback point
 
-The current committed rollback point is `74bed7a`. If this roadmap-only checkpoint fails validation, restore only `docs/V2_ROADMAP.md` from `74bed7a` after reviewing the diff. Do not use destructive reset or cleanup commands without first reviewing the affected files.
+The current committed rollback point is `0d7debc`. If this documentation-only checkpoint fails validation, restore only the uncommitted documentation files after reviewing the diff. Do not modify production behavior or delete backup evidence.

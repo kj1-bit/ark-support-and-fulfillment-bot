@@ -397,11 +397,11 @@ A creature catalog update is acceptable only when:
 ## Current checkpoint
 
 - Date: 2026-11-05
-- Branch: `feature/v2-remove-shell-execution`
-- Last committed commit: `21de487` (`Merge pull request #15 from kj1-bit/feature/v2-config-foundation`)
+- Branch: `feature/v2-authorization-foundation`
+- Last committed commit: `195e27a` (`Merge pull request #16 from kj1-bit/feature/v2-remove-shell-execution`)
 - Milestone: V2 Secure Core
-- Current task: Remove Discord-triggered operating-system execution and document operator-controlled deployment for issue #3.
-- Status: Issue #2 is merged and closed. Issue #3 source removal is applied for local review; production and deployed Discord commands remain unchanged until an approved deployment.
+- Current task: Build and review the isolated authorization, interaction-binding, redaction, and safe-error foundation for issue #4.
+- Status: Issues #2 and #3 are merged and closed. Issue #4 security primitives are applied locally without V1 runtime integration or production changes.
 
 ### Completed work
 
@@ -459,6 +459,16 @@ A creature catalog update is acceptable only when:
 - Verified executable runtime code contains no `child_process`, `exec`, `execFile`, `spawn`, or `fork` path.
 - Verified public configuration and user-facing documentation contain no obsolete deployment command or variable.
 
+### Completed issue #4 foundation work
+
+- Issue #4 isolated authorization foundation added without V1 runtime integration.
+- Authorization policy validation fails closed for missing or malformed configuration.
+- Authorization rejects wrong guild, channel, role, capability, and actor context.
+- Interaction tokens bind actor, guild, channel, message, action, and expiration.
+- Interaction-token tests reject context mismatch, expiration, and replay.
+- Recursive redaction removes sensitive fields and masks full EOS-like identifiers.
+- Safe application errors expose stable public categories without exposing internal causes.
+
 ### Tests and verification completed
 
 - `npm.cmd test`: 13 tests passed, including configuration, bootstrap, and schema-consistency tests.
@@ -473,6 +483,10 @@ A creature catalog update is acceptable only when:
 - Issue #3 unified suite passed with 17 tests and 0 failures.
 - Issue #3 security-only suite passed with 4 tests and 0 failures.
 - Runtime and public-documentation prohibition scans returned no unexpected matches.
+- Issue #4 unified suite passed with 22 tests and 0 failures.
+- Issue #4 security-only suite passed with 9 tests and 0 failures.
+- Syntax checks passed for every new security module and its test file.
+- V1 runtime-file status scan returned no issue #4 changes.
 ### Known failures and gaps
 
 - The formal rollback procedure is documented; test-environment rehearsal evidence is still required.
@@ -496,20 +510,15 @@ A creature catalog update is acceptable only when:
 
 ### Files expected to change in the next commit
 
-- `.env.example`
-- `deploy-commands.js`
-- `index.js`
-- `package.json`
-- `docs/FEATURES.md`
-- `docs/SETUP.md`
-- `docs/V2_DEPLOYMENT.md`
+- `src/security/*.js`
+- `tests/security/authorization-foundation.test.js`
+- `docs/V2_AUTHORIZATION.md`
 - `docs/V2_ROADMAP.md`
-- `tests/security/no-shell-execution.test.js`
 
 ### Next exact step
 
-Review PR #16, confirm it is clean and mergeable, merge it into `rebuild/v2-foundation`, manually close issue #3, and synchronize the local foundation branch.
+Run the unified and security-only suites, review negative-path and redaction evidence, inspect the diff, and commit the isolated issue #4 foundation if clean.
 
 ### Rollback point
 
-The committed rollback point before issue #3 is `21de487`. Before merge, revert commit `40885c6` or restore the feature branch from `21de487` after reviewing the diff. No production, Discord registration, database, or RCON rollback is required because this checkpoint is source-only.
+The committed rollback point is `195e27a`. Before commit, remove the isolated issue #4 files and restore `docs/V2_ROADMAP.md` from `195e27a` after reviewing the diff. No production, Discord, database, or RCON rollback is required.

@@ -80,8 +80,20 @@ test('Discord receives narrow services without database or transport',async()=>{
     composeRuntime:async()=>({authorization:{},interactionGuard:{},fulfillment:{},audit:{}}),
     createDiscordAdapter:async input=>{received=input;return {start:async()=>{}};}
   });
-  assert.deepEqual(Object.keys(received.services).sort(),['audit','authorization','fulfillment','interactionGuard']);
+  assert.deepEqual(
+    Object.keys(received.services).sort(),
+    [
+      'audit',
+      'authorization',
+      'catalogManager',
+      'fulfillment',
+      'interactionGuard',
+      'playerRepository',
+      'players'
+    ]
+  );
   assert(!('database' in received.services));
+  assert(!('transport' in received.services));
   assert.equal(result.database,db);
 });
 

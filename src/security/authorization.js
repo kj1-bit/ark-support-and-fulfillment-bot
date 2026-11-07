@@ -14,8 +14,16 @@ function requireSnowflake(value, field) {
 function createAuthorizationPolicy(options = {}) {
   const guildId = requireSnowflake(options.guildId, 'guildId');
   const capabilities = options.capabilities;
-  if (!capabilities || typeof capabilities !== 'object' || Array.isArray(capabilities)) {
-    throw safeError(ERROR_CODES.AUTHORIZATION_CONFIG_INVALID, 'Authorization configuration is invalid: capabilities.');
+  if (
+    !capabilities ||
+    typeof capabilities !== 'object' ||
+    Array.isArray(capabilities) ||
+    Object.keys(capabilities).length === 0
+  ) {
+    throw safeError(
+      ERROR_CODES.AUTHORIZATION_CONFIG_INVALID,
+      'Authorization configuration is invalid: capabilities.'
+    );
   }
   const normalized = {};
   for (const [name, definition] of Object.entries(capabilities)) {

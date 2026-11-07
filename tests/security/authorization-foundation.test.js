@@ -5,7 +5,17 @@ const { authorize, createAuthorizationPolicy, createInteractionGuard, ERROR_CODE
 const ids = { guild:'10000000000000001', role:'10000000000000002', channel:'10000000000000003', actor:'10000000000000004', message:'10000000000000005' };
 
 test('missing authorization configuration fails closed', () => {
-  assert.throws(() => createAuthorizationPolicy({ guildId: ids.guild }), error => error.code === ERROR_CODES.AUTHORIZATION_CONFIG_INVALID);
+  assert.throws(
+    () => createAuthorizationPolicy({ guildId: ids.guild }),
+    error => error.code === ERROR_CODES.AUTHORIZATION_CONFIG_INVALID
+  );
+  assert.throws(
+    () => createAuthorizationPolicy({
+      guildId: ids.guild,
+      capabilities: {}
+    }),
+    error => error.code === ERROR_CODES.AUTHORIZATION_CONFIG_INVALID
+  );
   assert.throws(() => createAuthorizationPolicy({ guildId: ids.guild, capabilities: { fulfill: { roleIds: [] } } }), error => error.code === ERROR_CODES.AUTHORIZATION_CONFIG_INVALID);
 });
 
@@ -51,4 +61,6 @@ test('safe errors expose stable categories and public messages', () => {
   assert.equal(error.code, ERROR_CODES.AUTHORIZATION_DENIED);
   assert.equal(error.publicMessage, 'This operation is not authorized.');
   assert(!error.publicMessage.includes('sensitive'));
+  assert(!Object.keys(error).includes('cause'));
+  assert(!JSON.stringify(error).includes('sensitive internal detail'));
 });

@@ -14,7 +14,12 @@ class SafeApplicationError extends Error {
     this.name = 'SafeApplicationError';
     this.code = code;
     this.publicMessage = publicMessage;
-    this.cause = options.cause;
+    Object.defineProperty(this, 'cause', {
+      value: options.cause,
+      enumerable: false,
+      writable: false,
+      configurable: false
+    });
     Object.freeze(this);
   }
 }

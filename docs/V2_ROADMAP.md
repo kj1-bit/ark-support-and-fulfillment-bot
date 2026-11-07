@@ -398,10 +398,10 @@ A creature catalog update is acceptable only when:
 
 - Date: 2026-11-05
 - Branch: `rebuild/v2-foundation`
-- Last committed commit: `4f96cac` (`Document V2 repository and configuration boundaries`)
+- Last committed commit: `056fc84` (`Document V2 rollback and recovery plan`)
 - Milestone: V2 foundation and documentation
-- Current task: Commit the formal rollback and recovery plan, then create GitHub milestones, issues, and project tracking before accelerated V2 foundation implementation.
-- Status: In progress; Phase 0 inventory and Phase 1 architecture are committed, and the formal rollback plan is prepared. No production behavior has changed.
+- Current task: Record the completed GitHub planning structure, then begin issue #2, the typed fail-closed configuration foundation.
+- Status: Foundation documentation, rollback planning, milestones, implementation issues, and the V2 project board are established. Ready to begin issue #2. No production behavior has changed.
 
 ### Completed work
 
@@ -434,6 +434,11 @@ A creature catalog update is acceptable only when:
 - Recorded the accelerated complete-build approach: generate the coordinated V2 implementation, integrate it through reviewable checkpoints, and require all definition-of-done evidence before production use.
 - Created `docs/V2_ROLLBACK.md` covering release, configuration, database, catalog, service, Discord, fulfillment, and full V1 recovery.
 - Defined rollback levels, checkpoint evidence, rehearsal stages, and acceptance criteria without changing production behavior.
+- Committed and pushed the rollback plan as `056fc84`.
+- Created five GitHub milestones covering foundation, secure core, trusted data and fulfillment, persistence and operations, and release and rollout.
+- Created issues #1 through #14 with acceptance criteria and the project definition of done.
+- Created the `Ticketbot V2 Rebuild` GitHub project and added all fourteen issues.
+- Verified issue #2 is the first accelerated implementation task: typed fail-closed configuration.
 
 ### Tests and verification completed
 
@@ -452,7 +457,7 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 ### Known failures and gaps
 
 - The formal rollback procedure is documented; test-environment rehearsal evidence is still required.
-- GitHub milestones, issues, and project-board state still require creation or verification.
+- GitHub milestones, issues, and project-board membership are complete; dependency relationships, status-field refinement, and branch protection remain future governance work.
 - Branch protection, CI gates, and public release tags are not yet configured.
 - The private operations repository still requires initialization without duplicated application source.
 - Broad archive and local-backup ignore patterns still require addition before implementation artifacts are introduced.
@@ -472,13 +477,12 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 
 ### Files expected to change in the next commit
 
-- `docs/V2_ROLLBACK.md`
 - `docs/V2_ROADMAP.md`
 
 ### Next exact step
 
-Copy `docs/V2_ROLLBACK.md` and this corrected roadmap into the repository, validate both, commit and push the documentation checkpoint, then create GitHub milestones, issues, and project tracking before beginning accelerated V2 foundation implementation.
+Copy this roadmap checkpoint into the repository, validate, commit, and push it. Then begin GitHub issue #2 by implementing the typed fail-closed V2 configuration foundation in a new reviewable checkpoint with tests, security review, compatibility notes, private-configuration impact, documentation, and rollback evidence.
 
 ### Rollback point
 
-The current committed rollback point is `4f96cac`. If this documentation-only checkpoint fails validation, restore only the uncommitted documentation files after reviewing the diff. Do not modify production behavior or delete backup evidence.
+The current committed rollback point is `056fc84`. If this roadmap-only checkpoint fails validation, restore only `docs/V2_ROADMAP.md` after reviewing the diff. Do not modify production behavior or delete GitHub planning records.

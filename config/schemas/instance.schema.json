@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ticketbot/v2/instance.schema.json",
+  "title": "Ticketbot V2 instance configuration",
+  "description": "Public machine-readable schema. Cross-field security rules are additionally enforced by src/config/validate-config.js.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runtime", "discord", "ark", "storage", "features"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runtime": { "$ref": "#/$defs/runtime" },
+    "discord": { "$ref": "#/$defs/discord" },
+    "ark": { "$ref": "#/$defs/ark" },
+    "storage": { "$ref": "#/$defs/storage" },
+    "features": { "$ref": "#/$defs/features" }
+  },
+  "$defs": {
+    "snowflake": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{16,19}$"
+    },
+    "nullableSnowflake": {
+      "anyOf": [
+        { "$ref": "#/$defs/snowflake" },
+        { "type": "null" }
+      ]
+    },
+    "secretReference": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{2,127}$"
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "environment", "logLevel"],
+      "properties": {
+        "mode": { "enum": ["mock", "test", "production"] },
+        "environment": { "type": "string", "minLength": 1 },
+        "logLevel": { "enum": ["debug", "info", "warn", "error"] }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["staff", "member", "fulfillmentModerator"],
+      "properties": {
+        "staff": { "$ref": "#/$defs/nullableSnowflake" },
+        "member": { "$ref": "#/$defs/nullableSnowflake" },
+        "fulfillmentModerator": { "$ref": "#/$defs/nullableSnowflake" }
+      }
+    },
+    "channels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ticketCategory", "vault", "requests", "playerNames", "pinsDashboard", "ticketLogs", "fulfillment", "fulfillmentLogs"],
+      "properties": {
+        "ticketCategory": { "$ref": "#/$defs/nullableSnowflake" },
+        "vault": { "$ref": "#/$defs/nullableSnowflake" },
+        "requests": { "$ref": "#/$defs/nullableSnowflake" },
+        "playerNames": { "$ref": "#/$defs/nullableSnowflake" },
+        "pinsDashboard": { "$ref": "#/$defs/nullableSnowflake" },
+        "ticketLogs": { "$ref": "#/$defs/nullableSnowflake" },
+        "fulfillment": { "$ref": "#/$defs/nullableSnowflake" },
+        "fulfillmentLogs": { "$ref": "#/$defs/nullableSnowflake" }
+      }
+    },
+    "discord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clientId", "guildId", "tokenSecret", "roles", "channels"],
+      "properties": {
+        "clientId": { "$ref": "#/$defs/snowflake" },
+        "guildId": { "$ref": "#/$defs/snowflake" },
+        "tokenSecret": { "$ref": "#/$defs/secretReference" },
+        "roles": { "$ref": "#/$defs/roles" },
+        "channels": { "$ref": "#/$defs/channels" }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "host", "port", "passwordSecret", "enabled", "testOnly", "operations"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "host": { "type": "string", "minLength": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "passwordSecret": { "$ref": "#/$defs/secretReference" },
+        "enabled": { "type": "boolean" },
+        "testOnly": { "type": "boolean" },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["listOnlinePlayers", "fulfillApprovedCreature"] }
+        }
+      }
+    },
+    "ark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeoutMs", "servers"],
+      "properties": {
+        "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 60000 },
+        "servers": { "type": "array", "items": { "$ref": "#/$defs/server" } }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["databasePath", "backupPath"],
+      "properties": {
+        "databasePath": { "type": "string", "minLength": 1 },
+        "backupPath": { "type": "string", "minLength": 1 }
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tickets", "pins", "playerNames", "shop", "fulfillment"],
+      "properties": {
+        "tickets": { "type": "boolean" },
+        "pins": { "type": "boolean" },
+        "playerNames": { "type": "boolean" },
+        "shop": { "type": "boolean" },
+        "fulfillment": { "type": "boolean" }
+      }
+    }
+  }
+}

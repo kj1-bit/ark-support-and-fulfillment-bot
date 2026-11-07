@@ -129,15 +129,15 @@ Exit criteria:
 
 ## Phase 2: Configuration foundation
 
-- [ ] Define a typed configuration schema.
-- [ ] Validate all required values at startup.
-- [ ] Reject malformed IDs, ports, booleans, paths, and server definitions.
-- [ ] Separate public defaults from private deployment configuration.
-- [ ] Replace ambiguous Boolean mock/live selection with an explicit deployment-mode enumeration.
-- [ ] Prevent ambiguous mock, test, and production states.
-- [ ] Redact secrets from logs and error output.
-- [ ] Add configuration validation tests.
-- [ ] Document migration from the V1 configuration format.
+- [x] Define a typed configuration schema.
+- [x] Validate all required values at startup.
+- [x] Reject malformed IDs, ports, booleans, paths, and server definitions.
+- [x] Separate public defaults from private deployment configuration.
+- [x] Replace ambiguous Boolean mock/live selection with an explicit deployment-mode enumeration.
+- [x] Prevent ambiguous mock, test, and production states.
+- [x] Redact secrets from logs and error output.
+- [x] Add configuration validation tests.
+- [x] Document migration from the V1 configuration format.
 
 Exit criteria:
 
@@ -397,11 +397,11 @@ A creature catalog update is acceptable only when:
 ## Current checkpoint
 
 - Date: 2026-11-05
-- Branch: `rebuild/v2-foundation`
-- Last committed commit: `056fc84` (`Document V2 rollback and recovery plan`)
-- Milestone: V2 foundation and documentation
-- Current task: Record the completed GitHub planning structure, then begin issue #2, the typed fail-closed configuration foundation.
-- Status: Foundation documentation, rollback planning, milestones, implementation issues, and the V2 project board are established. Ready to begin issue #2. No production behavior has changed.
+- Branch: `feature/v2-config-foundation`
+- Last committed commit: `9d0d965` (`Enforce V2 configuration before adapter startup`)
+- Milestone: V2 Secure Core
+- Current task: Complete PR #15 review corrections, rerun all issue #2 verification, and prepare the pull request for merge.
+- Status: Issue #2 implementation and bootstrap ordering are complete. PR #15 is open; the final review correction expands the public schema, adds schema-consistency tests, and refreshes acceptance evidence before merge.
 
 ### Completed work
 
@@ -439,21 +439,27 @@ A creature catalog update is acceptable only when:
 - Created issues #1 through #14 with acceptance criteria and the project definition of done.
 - Created the `Ticketbot V2 Rebuild` GitHub project and added all fourteen issues.
 - Verified issue #2 is the first accelerated implementation task: typed fail-closed configuration.
+- Added the isolated V2 configuration library, public schema/example, validation command, and configuration tests.
+- Added explicit deployment modes and fail-closed production rules.
+- Added safe summaries, deep freezing, V1 compatibility mapping, ignore hardening, migration documentation, and rollback notes.
+- Committed and pushed the configuration foundation as `e4fb907`.
+- Added an isolated V2 bootstrap with dependency-injected Discord and RCON adapter factories.
+- Proved configuration failure prevents all external adapter initialization.
+- Proved mock mode does not construct an RCON adapter.
+- Proved the safe configuration summary is emitted before external initialization.
+- Preserved the existing V1 `index.js` startup path without modification.
 
 ### Tests and verification completed
 
-- `npm.cmd install`
-- `npm.cmd ls --depth=0`
-- `npm.cmd install-scripts ls`
-- `git diff --check`
-- `git status --short`
-- `git status -sb`
-- `git log -3 --oneline`
-- Heading and file-size verification for `docs/V2_THREAT_MODEL.md`
-- Heading and file-size verification for `docs/V2_ARCHITECTURE.md`
-
-All completed checks passed. LF-to-CRLF messages were informational warnings.
-
+- `npm.cmd test`: 13 tests passed, including configuration, bootstrap, and schema-consistency tests.
+- `npm.cmd run test:bootstrap`: 4 tests passed.
+- `npm.cmd run config:validate -- config/examples/instance.example.json`: passed with redacted output.
+- JavaScript syntax checks passed for configuration and bootstrap files.
+- Private-value scan returned no matches.
+- V1 runtime-file status scan returned no matches.
+- `git diff --check`: passed; LF-to-CRLF notices were informational.
+- PR #15 opened from `feature/v2-config-foundation` into `rebuild/v2-foundation`.
+- Final corrective verification passed with 13 tests and 0 failures.
 ### Known failures and gaps
 
 - The formal rollback procedure is documented; test-environment rehearsal evidence is still required.
@@ -477,12 +483,12 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 
 ### Files expected to change in the next commit
 
+- `config/schemas/instance.schema.json`
+- `tests/config/schema-consistency.test.js`
 - `docs/V2_ROADMAP.md`
-
 ### Next exact step
 
-Copy this roadmap checkpoint into the repository, validate, commit, and push it. Then begin GitHub issue #2 by implementing the typed fail-closed V2 configuration foundation in a new reviewable checkpoint with tests, security review, compatibility notes, private-configuration impact, documentation, and rollback evidence.
-
+Run the full configuration and bootstrap test suite including schema-consistency tests, validate the public example, inspect PR #15 again, commit and push the review correction, then merge only after the pull request is clean and all evidence is recorded.
 ### Rollback point
 
-The current committed rollback point is `056fc84`. If this roadmap-only checkpoint fails validation, restore only `docs/V2_ROADMAP.md` after reviewing the diff. Do not modify production behavior or delete GitHub planning records.
+The committed rollback point before this review correction is `9d0d965`. Before commit, restore the schema and roadmap from `9d0d965` and remove `tests/config/schema-consistency.test.js` after reviewing the diff. No production, Discord, RCON, database, or service rollback is required because V1 runtime behavior remains unchanged.

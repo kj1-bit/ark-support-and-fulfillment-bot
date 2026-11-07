@@ -1,4 +1,42 @@
 'use strict';
-const {createFulfillmentController}=require('./fulfillment-controller');const {createDiscordRouter}=require('./router');const views=require('./fulfillment-view');
-function createDiscordAdapter({client,config,services,logSink=async()=>{}}){if(!client||typeof client.on!=='function'||typeof client.login!=='function'||typeof client.destroy!=='function')throw new TypeError('Discord client on/login/destroy interface is required.');if(!config?.features)return Object.freeze({start:async()=>{},stop:async()=>{}});if(config.features.fulfillment!==true)return Object.freeze({start:async()=>{},stop:async()=>{}});const controller=createFulfillmentController({services});const router=createDiscordRouter({controller,views,logSink});let listener;return Object.freeze({async start(){if(listener)throw new Error('Discord adapter is already started.');listener=interaction=>router.handle(interaction);client.on('interactionCreate',listener);await client.login(config.discord.token);},async stop(){if(listener&&typeof client.off==='function')client.off('interactionCreate',listener);listener=null;await client.destroy();}});}
-module.exports={createDiscordAdapter};
+const { createFeatureManager } = require('../../features/feature-manager');
+const { createFulfillmentFeature } = require('../../features/fulfillment-feature');
+
+function createDiscordAdapter({ client, config, services, logSink = async () => {} }) {
+  if (!client || typeof client.on !== 'function' || typeof client.login !== 'function' || typeof client.destroy !== 'function') {
+    throw new TypeError('Discord client on/login/destroy interface is required.');
+  }
+
+  const context = Object.freeze({ client, config, services, logSink });
+  const manager = createFeatureManager({
+    features: [createFulfillmentFeature()],
+    enabled: config?.features || {},
+    context
+  });
+  let started = false;
+
+  return Object.freeze({
+    featureNames: manager.names,
+    async start() {
+      if (started) throw new Error('Discord adapter is already started.');
+      try {
+        await manager.initialize();
+        await manager.register();
+        await manager.start();
+        if (manager.names.length === 0) return;
+        await client.login(config.discord.token);
+        started = true;
+      } catch (error) {
+        await manager.stop().catch(() => {});
+        throw error;
+      }
+    },
+    async stop() {
+      if (!started) return;
+      await manager.stop();
+      await client.destroy();
+      started = false;
+    }
+  });
+}
+module.exports = { createDiscordAdapter };

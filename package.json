@@ -4,12 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js tests/v2-core/*.test.js",
+    "test": "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js tests/v2-core/*.test.js tests/persistence/*.test.js",
     "test:config": "node --test tests/config/*.test.js",
     "config:validate": "node scripts/validate-config.js",
     "test:bootstrap": "node --test tests/bootstrap/*.test.js",
     "test:security": "node --test tests/security/*.test.js",
-    "test:v2-core": "node --test tests/v2-core/*.test.js"
+    "test:v2-core": "node --test tests/v2-core/*.test.js",
+    "test:persistence": "node --test tests/persistence/*.test.js"
   },
   "keywords": [],
   "author": "",

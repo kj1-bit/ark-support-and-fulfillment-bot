@@ -17,7 +17,23 @@ function createSqliteFulfillmentRepository(database) {
     async update(id, nextState, patch={}) {
       const current=await this.get(id); if(!current) throw new Error('Fulfillment request not found.'); transition(current.state,nextState);
       const resultJson=patch.results===undefined?null:JSON.stringify(patch.results);
-      await database.run('UPDATE fulfillment_requests SET state=?, completed_at=COALESCE(?,completed_at), result_json=COALESCE(?,result_json) WHERE id=? AND state=?', [nextState,patch.completedAt??null,resultJson,id,current.state]);
+      const result = await database.run(
+        'UPDATE fulfillment_requests SET state=?, completed_at=COALESCE(?,completed_at), result_json=COALESCE(?,result_json) WHERE id=? AND state=?',
+        [
+          nextState,
+          patch.completedAt ?? null,
+          resultJson,
+          id,
+          current.state
+        ]
+      );
+
+      if (result.changes !== 1) {
+        throw new Error(
+          'Fulfillment request changed before the update completed.'
+        );
+      }
+
       return this.get(id);
     }
   });

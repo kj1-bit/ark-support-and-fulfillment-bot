@@ -1,6 +1,15 @@
 'use strict';
 function createMigrationRunner({ database, migrations, clock = Date.now }) {
-  if (!database || typeof database.executeSql !== 'function' || typeof database.all !== 'function') throw new TypeError('database executeSql/all interface is required.');
+  if (
+    !database ||
+    typeof database.executeSql !== 'function' ||
+    typeof database.all !== 'function' ||
+    typeof database.run !== 'function'
+  ) {
+    throw new TypeError(
+      'database executeSql/all/run interface is required.'
+    );
+  }
   if (!Array.isArray(migrations) || migrations.length === 0) throw new TypeError('migrations are required.');
   const ordered = [...migrations].sort((a,b)=>a.version-b.version);
   const versions = new Set();

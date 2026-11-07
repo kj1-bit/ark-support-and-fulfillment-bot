@@ -1,3 +1,35 @@
-'use strict';
-function toInteractionContext(interaction){const actorId=interaction?.user?.id;const guildId=interaction?.guildId;const channelId=interaction?.channelId;const messageId=interaction?.message?.id;if(!actorId||!guildId||!channelId||!messageId)throw new TypeError('Complete Discord interaction context is required.');const roleIds=interaction.member?.roles?.cache?Array.from(interaction.member.roles.cache.keys()):Array.from(interaction.member?.roleIds||[]);return Object.freeze({actorId,guildId,channelId,messageId,roleIds:Object.freeze(roleIds)});}
-module.exports={toInteractionContext};
+﻿'use strict';
+
+function getRoleIds(interaction) {
+  if (interaction?.member?.roles?.cache) {
+    return Array.from(interaction.member.roles.cache.keys());
+  }
+
+  return Array.from(interaction?.member?.roleIds || []);
+}
+
+function toInteractionContext(interaction, options = {}) {
+  const requireMessage = options.requireMessage === true;
+  const actorId = interaction?.user?.id;
+  const guildId = interaction?.guildId;
+  const channelId = interaction?.channelId;
+  const messageId = interaction?.message?.id || options.messageId || null;
+
+  if (!actorId || !guildId || !channelId) {
+    throw new TypeError('Complete guild interaction context is required.');
+  }
+
+  if (requireMessage && !messageId) {
+    throw new TypeError('A message-bound interaction context is required.');
+  }
+
+  return Object.freeze({
+    actorId,
+    guildId,
+    channelId,
+    messageId,
+    roleIds: Object.freeze(getRoleIds(interaction))
+  });
+}
+
+module.exports = { toInteractionContext };

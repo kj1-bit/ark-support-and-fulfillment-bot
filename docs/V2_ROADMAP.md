@@ -398,10 +398,10 @@ A creature catalog update is acceptable only when:
 
 - Date: 2026-11-05
 - Branch: `feature/v2-config-foundation`
-- Last committed commit: `e4fb907` (`Add fail-closed V2 configuration foundation`)
+- Last committed commit: `9d0d965` (`Enforce V2 configuration before adapter startup`)
 - Milestone: V2 Secure Core
-- Current task: Validate and commit the isolated V2 bootstrap startup-order checkpoint for issue #2.
-- Status: The configuration foundation and isolated V2 bootstrap are implemented and tested. Configuration validation precedes Discord and RCON adapter construction, mock mode constructs no RCON adapter, and V1 production startup remains unchanged.
+- Current task: Complete PR #15 review corrections, rerun all issue #2 verification, and prepare the pull request for merge.
+- Status: Issue #2 implementation and bootstrap ordering are complete. PR #15 is open; the final review correction expands the public schema, adds schema-consistency tests, and refreshes acceptance evidence before merge.
 
 ### Completed work
 
@@ -451,15 +451,15 @@ A creature catalog update is acceptable only when:
 
 ### Tests and verification completed
 
-- `node --test tests/config/*.test.js`
-- `node scripts/validate-config.js config/examples/instance.example.json`
-- Syntax checks for all new JavaScript files
-- JSON parsing for schemas, examples, and `package.json`
-- Package archive content and path traversal checks
-- Existing foundation verification retained
-
-All package-construction checks passed in the build environment. Local Windows verification remains required before commit.
-
+- `npm.cmd test`: 13 tests passed, including configuration, bootstrap, and schema-consistency tests.
+- `npm.cmd run test:bootstrap`: 4 tests passed.
+- `npm.cmd run config:validate -- config/examples/instance.example.json`: passed with redacted output.
+- JavaScript syntax checks passed for configuration and bootstrap files.
+- Private-value scan returned no matches.
+- V1 runtime-file status scan returned no matches.
+- `git diff --check`: passed; LF-to-CRLF notices were informational.
+- PR #15 opened from `feature/v2-config-foundation` into `rebuild/v2-foundation`.
+- Final corrective verification passed with 13 tests and 0 failures.
 ### Known failures and gaps
 
 - The formal rollback procedure is documented; test-environment rehearsal evidence is still required.
@@ -483,20 +483,12 @@ All package-construction checks passed in the build environment. Local Windows v
 
 ### Files expected to change in the next commit
 
-- `.gitignore`
-- `package.json`
-- `config/examples/instance.example.json`
 - `config/schemas/instance.schema.json`
-- `src/config/*.js`
-- `scripts/validate-config.js`
-- `tests/config/config-foundation.test.js`
-- `docs/V2_CONFIGURATION.md`
+- `tests/config/schema-consistency.test.js`
 - `docs/V2_ROADMAP.md`
-
 ### Next exact step
 
-Apply the prepared configuration-foundation overlay to `feature/v2-config-foundation`, inspect the diff, run the configuration tests and validation command on Windows, and review security and compatibility evidence before staging.
-
+Run the full configuration and bootstrap test suite including schema-consistency tests, validate the public example, inspect PR #15 again, commit and push the review correction, then merge only after the pull request is clean and all evidence is recorded.
 ### Rollback point
 
-The committed rollback point is `f18b0e2`. Before commit, remove new issue #2 files and restore modified tracked files from `f18b0e2` only after reviewing the diff. No production, database, Discord, or RCON rollback is required because this library is not wired into V1 runtime behavior.
+The committed rollback point before this review correction is `9d0d965`. Before commit, restore the schema and roadmap from `9d0d965` and remove `tests/config/schema-consistency.test.js` after reviewing the diff. No production, Discord, RCON, database, or service rollback is required because V1 runtime behavior remains unchanged.

@@ -496,11 +496,20 @@ A creature catalog update is acceptable only when:
 
 ### Files expected to change in the next commit
 
-- .env.example`n- index.js`n- deploy-commands.js`n- package.json`n- docs/FEATURES.md`n- docs/SETUP.md`n- docs/V2_DEPLOYMENT.md`n- docs/V2_ROADMAP.md`n- 	ests/security/no-shell-execution.test.js`n
+- `.env.example`
+- `deploy-commands.js`
+- `index.js`
+- `package.json`
+- `docs/FEATURES.md`
+- `docs/SETUP.md`
+- `docs/V2_DEPLOYMENT.md`
+- `docs/V2_ROADMAP.md`
+- `tests/security/no-shell-execution.test.js`
+
 ### Next exact step
 
-Run the full and security-only test suites, repeat the static process-execution scan, inspect the diff, and review compatibility, private-configuration, deployment, and rollback evidence before staging issue #3.
+Review PR #16, confirm it is clean and mergeable, merge it into `rebuild/v2-foundation`, manually close issue #3, and synchronize the local foundation branch.
 
 ### Rollback point
 
-The committed rollback point is 21de487. Before commit, restore changed tracked files from 21de487 and remove the new deployment document and security test after reviewing the diff. No production, Discord registration, database, or RCON rollback is required because this checkpoint is source-only.
+The committed rollback point before issue #3 is `21de487`. Before merge, revert commit `40885c6` or restore the feature branch from `21de487` after reviewing the diff. No production, Discord registration, database, or RCON rollback is required because this checkpoint is source-only.

@@ -10,6 +10,9 @@ node_modules/
 *.pfx
 *.p12
 
+# Installation-specific V2 configuration
+config/runtime/*.local.json
+
 # Runtime databases and backups
 database.sqlite
 database-*.sqlite
@@ -17,6 +20,16 @@ database-*.sqlite
 *.sqlite3
 *.sqlite-backup
 *.sqlite.backup-*
+runtime/
+backups/
+
+# Private archives and artifacts
+*.7z
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+artifacts/private/
 
 # Process manager and logs
 .pm2/

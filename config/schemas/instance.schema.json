@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ticketbot/v2/instance.schema.json",
+  "title": "Ticketbot V2 instance configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runtime",
+    "discord",
+    "ark",
+    "storage",
+    "features"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "environment",
+        "logLevel"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "mock",
+            "test",
+            "production"
+          ]
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logLevel": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        }
+      }
+    },
+    "discord": {
+      "type": "object"
+    },
+    "ark": {
+      "type": "object"
+    },
+    "storage": {
+      "type": "object"
+    },
+    "features": {
+      "type": "object"
+    }
+  },
+  "description": "Public documentation schema. Runtime validation additionally enforces cross-field security rules in src/config/validate-config.js."
+}

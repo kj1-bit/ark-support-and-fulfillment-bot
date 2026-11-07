@@ -4,9 +4,11 @@ const SUPPORTED = new Set(['listOnlinePlayers', 'fulfillApprovedCreature']);
 function createServerRegistry(servers) {
   if (!Array.isArray(servers) || servers.length === 0) throw new TypeError('Server registry requires entries.');
   const map = new Map();
+  const ids = new Set();
   for (const source of servers) {
     const id = requireIdentifier('serverId', source?.id);
-    if (map.has(id)) throw new TypeError(`Duplicate server ID: ${id}`);
+    if (ids.has(id)) throw new TypeError(`Duplicate server ID: ${id}`);
+    ids.add(id);
     if (source.enabled !== true) continue;
     if (!Array.isArray(source.operations) || source.operations.length === 0) throw new TypeError(`Server ${id} requires operations.`);
     for (const op of source.operations) if (!SUPPORTED.has(op)) throw new TypeError(`Unsupported operation ${op} for ${id}.`);

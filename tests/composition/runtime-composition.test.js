@@ -55,7 +55,7 @@ test('composition checks integrity, backs up, migrates, and constructs narrow se
     randomUUID:()=> '00000000-0000-4000-8000-000000000001',
     createBackup:async()=>{order.push('backup');return {sha256:'safe'};}, env:{PIN_PROTECTION_KEY:Buffer.alloc(32,7).toString('base64')}
   });
-  assert.equal(runtime.schemaVersion,5);
+  assert.equal(runtime.schemaVersion,6);
   assert.equal(runtime.backup.sha256,'safe');
   assert.equal(order[0],'backup');
   assert(runtime.fulfillment);
@@ -86,6 +86,7 @@ test('Discord receives narrow services without database or transport',async()=>{
       'audit',
       'authorization',
       'catalogManager',
+      'dashboards',
       'fulfillment',
       'interactionGuard',
       'pins',

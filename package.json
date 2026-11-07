@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/config/*.test.js",
+    "test": "node --test tests/config/*.test.js tests/bootstrap/*.test.js",
     "test:config": "node --test tests/config/*.test.js",
-    "config:validate": "node scripts/validate-config.js"
+    "config:validate": "node scripts/validate-config.js",
+    "test:bootstrap": "node --test tests/bootstrap/*.test.js"
   },
   "keywords": [],
   "author": "",

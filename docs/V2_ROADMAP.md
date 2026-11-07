@@ -130,7 +130,7 @@ Exit criteria:
 ## Phase 2: Configuration foundation
 
 - [x] Define a typed configuration schema.
-- [ ] Validate all required values at startup.
+- [x] Validate all required values at startup.
 - [x] Reject malformed IDs, ports, booleans, paths, and server definitions.
 - [x] Separate public defaults from private deployment configuration.
 - [x] Replace ambiguous Boolean mock/live selection with an explicit deployment-mode enumeration.
@@ -398,10 +398,10 @@ A creature catalog update is acceptable only when:
 
 - Date: 2026-11-05
 - Branch: `feature/v2-config-foundation`
-- Last committed commit: `f18b0e2` (`Record V2 GitHub planning structure`)
+- Last committed commit: `e4fb907` (`Add fail-closed V2 configuration foundation`)
 - Milestone: V2 Secure Core
-- Current task: Validate and review the isolated typed fail-closed configuration foundation for issue #2.
-- Status: Issue #2 implementation package is prepared with schemas, examples, validation, redaction, V1 mapping, tests, documentation, and rollback notes. It is not connected to V1 runtime behavior.
+- Current task: Validate and commit the isolated V2 bootstrap startup-order checkpoint for issue #2.
+- Status: The configuration foundation and isolated V2 bootstrap are implemented and tested. Configuration validation precedes Discord and RCON adapter construction, mock mode constructs no RCON adapter, and V1 production startup remains unchanged.
 
 ### Completed work
 
@@ -442,6 +442,12 @@ A creature catalog update is acceptable only when:
 - Added the isolated V2 configuration library, public schema/example, validation command, and configuration tests.
 - Added explicit deployment modes and fail-closed production rules.
 - Added safe summaries, deep freezing, V1 compatibility mapping, ignore hardening, migration documentation, and rollback notes.
+- Committed and pushed the configuration foundation as `e4fb907`.
+- Added an isolated V2 bootstrap with dependency-injected Discord and RCON adapter factories.
+- Proved configuration failure prevents all external adapter initialization.
+- Proved mock mode does not construct an RCON adapter.
+- Proved the safe configuration summary is emitted before external initialization.
+- Preserved the existing V1 `index.js` startup path without modification.
 
 ### Tests and verification completed
 

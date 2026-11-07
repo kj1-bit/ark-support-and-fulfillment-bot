@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js tests/v2-core/*.test.js tests/persistence/*.test.js tests/composition/*.test.js tests/trusted-state/*.test.js tests/persistent-trusted-state/*.test.js tests/persistent-runtime/*.test.js tests/discord-adapter/*.test.js tests/discord-lifecycle/*.test.js",
+    "test": "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js tests/v2-core/*.test.js tests/persistence/*.test.js tests/composition/*.test.js tests/trusted-state/*.test.js tests/persistent-trusted-state/*.test.js tests/persistent-runtime/*.test.js tests/discord-adapter/*.test.js tests/discord-lifecycle/*.test.js tests/feature-contracts/*.test.js",
     "test:config": "node --test tests/config/*.test.js",
     "config:validate": "node scripts/validate-config.js",
     "test:bootstrap": "node --test tests/bootstrap/*.test.js",
@@ -16,7 +16,8 @@
     "test:persistent-state": "node --test tests/persistent-trusted-state/*.test.js",
     "test:persistent-runtime": "node --test tests/persistent-runtime/*.test.js",
     "test:discord-adapter": "node --test tests/discord-adapter/*.test.js",
-    "test:discord-lifecycle": "node --test tests/discord-lifecycle/*.test.js"
+    "test:discord-lifecycle": "node --test tests/discord-lifecycle/*.test.js",
+    "test:features": "node --test tests/feature-contracts/*.test.js"
   },
   "keywords": [],
   "author": "",

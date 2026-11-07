@@ -398,10 +398,10 @@ A creature catalog update is acceptable only when:
 
 - Date: 2026-11-05
 - Branch: `rebuild/v2-foundation`
-- Last committed commit: `0d7debc` (`Record verified V1 baseline and backups`)
+- Last committed commit: `4f96cac` (`Document V2 repository and configuration boundaries`)
 - Milestone: V2 foundation and documentation
-- Current task: Commit the repository-boundary and configuration inventory, then complete rollback documentation and GitHub planning before accelerated V2 foundation implementation.
-- Status: In progress; Phase 0 inventory is documented and Phase 1 architecture documentation is committed. No production behavior has changed.
+- Current task: Commit the formal rollback and recovery plan, then create GitHub milestones, issues, and project tracking before accelerated V2 foundation implementation.
+- Status: In progress; Phase 0 inventory and Phase 1 architecture are committed, and the formal rollback plan is prepared. No production behavior has changed.
 
 ### Completed work
 
@@ -432,6 +432,8 @@ A creature catalog update is acceptable only when:
 - Created `docs/V2_REPOSITORY_BOUNDARY.md` with tracked, ignored, generated, runtime, configuration, catalog, deployment, and migration ownership.
 - Recorded the current configuration-name inventory without including secret values.
 - Recorded the accelerated complete-build approach: generate the coordinated V2 implementation, integrate it through reviewable checkpoints, and require all definition-of-done evidence before production use.
+- Created `docs/V2_ROLLBACK.md` covering release, configuration, database, catalog, service, Discord, fulfillment, and full V1 recovery.
+- Defined rollback levels, checkpoint evidence, rehearsal stages, and acceptance criteria without changing production behavior.
 
 ### Tests and verification completed
 
@@ -449,7 +451,7 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 
 ### Known failures and gaps
 
-- The formal rollback procedure and rehearsal evidence still require completion or verification.
+- The formal rollback procedure is documented; test-environment rehearsal evidence is still required.
 - GitHub milestones, issues, and project-board state still require creation or verification.
 - Branch protection, CI gates, and public release tags are not yet configured.
 - The private operations repository still requires initialization without duplicated application source.
@@ -470,13 +472,13 @@ All completed checks passed. LF-to-CRLF messages were informational warnings.
 
 ### Files expected to change in the next commit
 
-- `docs/V2_REPOSITORY_BOUNDARY.md`
+- `docs/V2_ROLLBACK.md`
 - `docs/V2_ROADMAP.md`
 
 ### Next exact step
 
-Copy `docs/V2_REPOSITORY_BOUNDARY.md` and this corrected roadmap into the repository, validate both, commit and push the documentation checkpoint, then create the formal rollback procedure and GitHub planning structure before beginning the accelerated V2 foundation implementation.
+Copy `docs/V2_ROLLBACK.md` and this corrected roadmap into the repository, validate both, commit and push the documentation checkpoint, then create GitHub milestones, issues, and project tracking before beginning accelerated V2 foundation implementation.
 
 ### Rollback point
 
-The current committed rollback point is `0d7debc`. If this documentation-only checkpoint fails validation, restore only the uncommitted documentation files after reviewing the diff. Do not modify production behavior or delete backup evidence.
+The current committed rollback point is `4f96cac`. If this documentation-only checkpoint fails validation, restore only the uncommitted documentation files after reviewing the diff. Do not modify production behavior or delete backup evidence.

@@ -9,6 +9,7 @@ const { createFulfillmentService } = require('../application/fulfillment-service
 const { createAuditLogger } = require('../logging/audit-logger');
 const { createMigrationRunner } = require('../migrations/migration-runner');
 const migration001 = require('../migrations/001-v2-core');
+const migration002 = require('../migrations/002-trusted-state');
 const { checkIntegrity } = require('../recovery/database-recovery');
 
 function buildAuthorizationOptions(config) {
@@ -61,7 +62,7 @@ async function composeRuntime(options = {}) {
   const backup = await createBackup();
   const migrationRunner = createMigrationRunner({
     database,
-    migrations: [migration001],
+    migrations: [migration001, migration002],
     clock
   });
   const schemaVersion = await migrationRunner.run();

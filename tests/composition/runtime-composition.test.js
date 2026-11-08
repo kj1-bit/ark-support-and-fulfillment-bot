@@ -16,7 +16,7 @@ function frozenConfig() {
     discord: Object.freeze({
       clientId: ids.clientId, guildId: ids.guildId, tokenSecret: 'DISCORD_TOKEN',
       roles: Object.freeze({ staff: ids.roleId, member: ids.roleId, fulfillmentModerator: ids.roleId }),
-      channels: Object.freeze({ fulfillment: ids.channelId, fulfillmentLogs: ids.logChannelId })
+      channels: Object.freeze({ fulfillment: ids.channelId, fulfillmentLogs: ids.logChannelId, playerNames: ids.channelId, requests: ids.channelId, ticketLogs: ids.logChannelId, vault: ids.channelId, pinsDashboard: ids.logChannelId })
     }),
     ark: Object.freeze({
       timeoutMs: 10000,

@@ -943,6 +943,25 @@
     "requiresDlc": false
   },
   {
+    "id": "enigmasaur",
+    "name": "Enigmasaur",
+    "aliases": [
+      "enigma",
+      "chameleon"
+    ],
+    "blueprint": "/Game/ASA/Dinos/Chameleon/Chameleon_Character_BP.Chameleon_Character_BP",
+    "tameable": true,
+    "supportsGender": false,
+    "saddleApplicable": true,
+    "sourceMod": "Fantastic Tames Season 1",
+    "requiresDlc": true,
+    "dlcName": "ARK Fantastic Tames: Season 1",
+    "deliveryMode": "single-random",
+    "entityId": "Chameleon_Character_BP_C",
+    "acquisition": "standard",
+    "enabled": true
+  },
+  {
     "id": "equus",
     "name": "Equus",
     "aliases": [

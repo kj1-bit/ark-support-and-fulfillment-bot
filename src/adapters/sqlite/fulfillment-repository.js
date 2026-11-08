@@ -2,8 +2,18 @@
 
 const { transition } = require('../../domain/fulfillment/state-machine');
 
+function parseResults(json) {
+  try {
+    const value = JSON.parse(json);
+    return Array.isArray(value) && value.length <= 20 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function parse(row) {
   if (!row) return null;
+  const results = row.result_json ? parseResults(row.result_json) : undefined;
   return Object.freeze({
     id: row.id,
     idempotencyKey: row.idempotency_key,
@@ -22,7 +32,8 @@ function parse(row) {
     expiresAt: row.expires_at,
     claimedAt: row.claimed_at,
     completedAt: row.completed_at,
-    results: row.result_json ? JSON.parse(row.result_json) : undefined
+    results: results === null ? undefined : results,
+    ...(results === null ? { resultsCorrupt: true } : {})
   });
 }
 

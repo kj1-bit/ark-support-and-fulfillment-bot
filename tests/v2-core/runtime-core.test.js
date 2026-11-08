@@ -54,12 +54,6 @@ test('empty fulfillment results fail closed without reporting success',async()=>
     uuid:()=>'00000000-0000-4000-8000-000000000001'
   });
 
-  test('in-memory claim rejects a request at its expiration boundary',()=>{
-    const repo=createInMemoryFulfillmentRepository();
-    repo.create({id:'expires-now',idempotencyKey:'expires-now',actorId:'actor',state:STATES.PENDING,expiresAt:50});
-    assert.throws(()=>repo.claim('expires-now','actor',50),/expired/);
-  });
-
   const pending=await service.createPending({
     context,
     creatureId:'rex',
@@ -82,4 +76,10 @@ test('empty fulfillment results fail closed without reporting success',async()=>
 
   assert.equal(repository.get(pending.id).state,STATES.UNCERTAIN);
   assert(events.some(event=>event.type==='fulfillment.uncertain'));
+});
+
+test('in-memory claim rejects a request at its expiration boundary',()=>{
+  const repo=createInMemoryFulfillmentRepository();
+  repo.create({id:'expires-now',idempotencyKey:'expires-now',actorId:'actor',state:STATES.PENDING,expiresAt:50});
+  assert.throws(()=>repo.claim('expires-now','actor',50),/expired/);
 });

@@ -38,6 +38,7 @@ const migration007 = require('../migrations/007-fulfillment-targets');
 const migration008 = require('../migrations/008-trusted-identity-associations');
 const migration009 = require('../migrations/009-discord-panels');
 const migration010 = require('../migrations/010-fulfillment-result-redaction');
+const migration011 = require('../migrations/011-schema-integrity');
 const { checkIntegrity } = require('../recovery/database-recovery');
 
 function buildAuthorizationOptions(config) {
@@ -133,7 +134,7 @@ async function composeRuntime(options = {}) {
     database,
     migrations: [
       migration001, migration002, migration003, migration004, migration005,
-      migration006, migration007, migration008, migration009, migration010
+      migration006, migration007, migration008, migration009, migration010, migration011
     ],
     clock
   }).run();

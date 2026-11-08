@@ -14,7 +14,7 @@ function registerStaleCommandListener(client, logSink = async () => {}) {
       console.error('Retired command response could not be sent.');
     }
     try {
-      await logSink(Object.freeze({ type: 'discord.command.retired', at: new Date().toISOString(),
+      await logSink(Object.freeze({ type: 'discord.slash_retired', at: new Date().toISOString(),
         data: Object.freeze({ command: String(interaction.commandName || '').slice(0, 32) }) }));
     } catch {
       console.error('Retired command event could not be logged.');

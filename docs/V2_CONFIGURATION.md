@@ -62,10 +62,14 @@ The enabled features restore V1-style request, Vault, IGN, fulfillment, and inli
 
 Keep `ticketLogs`, `pinsDashboard`, and `fulfillmentLogs` staff-only. Inline dashboard rendering fails with a generic audit notice if ordinary roles can view the channel or permissions cannot be verified; it never silently publishes an ephemeral replacement. Bot integration roles (managed roles tagged with a bot ID, such as this bot's own role) are ignored, so adding the bot's role to a private channel is fine. `@everyone`, booster roles, and every other non-staff role still count as public visibility. Staff interaction authorization remains required for paging.
 
+When tickets are enabled, `ticketLogs` also hosts the **Manage Legacy Ticket** panel for preserved record-only requests. It uses the same staff-only privacy checks even with dashboards disabled. Staff enter a ticket ID and manage its original state through private, message-bound controls; no additional configuration or private channels are needed.
+
 With `pins` enabled, turn on **Server Members Intent** in the test application's Developer Portal. The launcher requests Guild Members only for that feature so **Generate Missing PINs** can enumerate eligible members. This does not grant PINs to unverified users or reveal them publicly.
 
 ## Important distinction
 
 `schemaVersion` in the JSON file remains `1`. The SQLite database schema is a separate version, currently `13`. Do not edit either number to migrate an installation. Migrations 012 (private ticket metadata/counter) and 013 (generated Vault PINs) are additive and run through runtime composition; first exercise them against a disposable copy of the existing V2 database with a verified backup. Existing record-only tickets are retained rather than creating channels retroactively.
+
+Staff can deliberately claim, complete, close, or reopen preserved record-only tickets through the legacy management panel. Their original statuses remain unchanged until an authorized action; closing makes the records eligible for normal closed-ticket retention.
 
 Configuration validity does not mean that a live/test deployment is accepted. `scripts/start-v2.js` wires the runtime dependencies, but test application/server connectivity, Debian service installation, and the isolated acceptance checklist still require operator verification.

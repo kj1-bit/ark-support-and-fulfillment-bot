@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { assertUniqueCustomIds } = require('../helpers/custom-ids');
 const { pagePayload } = require('../../src/features/dashboards-feature');
-const { requestPayload } = require('../../src/features/tickets-feature');
+const { requestPayload, legacyPanelPayload, legacyTicketPayload } = require('../../src/features/tickets-feature');
 const { vaultPanelPayload, moderationPayload } = require('../../src/features/pins-feature');
 const { ticketControls } = require('../../src/adapters/discord/ticket-channel-gateway');
 const { fulfillmentPanelView, playerNamesPanelView } = require('../../src/adapters/discord/fulfillment-view');
@@ -13,6 +13,10 @@ test('every standing panel and ticket control message uses unique custom_ids', (
   const payloads = {
     'request panel (shop)':requestPayload(true),
     'request panel (no shop)':requestPayload(false),
+    'legacy ticket panel':legacyPanelPayload(),
+    'legacy ticket controls':legacyTicketPayload({
+      id:'TKT-legacy', state:'OPEN', type:'SUPPORT', playerName:'Survivor', description:'Original request'
+    }, ['claim','complete','close'].map(action => ({ action, token:`token-${action}` }))),
     'vault panel':vaultPanelPayload(),
     'pin moderation (pending)':moderationPayload({ id:'PIN-1',state:'PENDING' }),
     'pin moderation (delivered)':moderationPayload({ id:'PIN-1',state:'DELIVERED' }),

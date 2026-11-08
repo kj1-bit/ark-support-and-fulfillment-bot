@@ -240,6 +240,7 @@ async function composeRuntime(options = {}) {
     repository: ticketRepository,
     playerNames,
     authorization,
+    interactionGuard,
     audit,
     clock,
     uuid: randomUUID,

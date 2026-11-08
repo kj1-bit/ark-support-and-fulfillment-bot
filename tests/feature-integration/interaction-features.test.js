@@ -245,7 +245,7 @@ test('retired slash commands get one private panel pointer and never reach a ser
   assert.equal(calls.tickets.length, 0);
   assert.equal(calls.pin, null);
   assert.equal(calls.playerName, null);
-  assert.deepEqual(calls.logs.filter(event => event.type === 'discord.command.retired').map(event => event.data.command),
+  assert.deepEqual(calls.logs.filter(event => event.type === 'discord.slash_retired').map(event => event.data.command),
     ['ticket', 'pin', 'player-name', 'player-name-verify', 'player-link', 'dino-fulfillment', 'shop-search']);
   await adapter.stop();
   assert.equal(listeners.length, 0);

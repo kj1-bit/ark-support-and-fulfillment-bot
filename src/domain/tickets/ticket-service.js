@@ -9,7 +9,7 @@ function validateText(value) {
   return text;
 }
 
-function createTicketService({ repository, playerNames, authorization, audit, clock = Date.now, uuid, channelConfig }) {
+function createTicketService({ repository, playerNames, authorization, interactionGuard, audit, clock = Date.now, uuid, channelConfig }) {
   if (!repository || typeof repository.create !== 'function' || typeof repository.claim !== 'function'
     || typeof repository.transition !== 'function') throw new TypeError('ticket repository interface is required.');
   if (!playerNames || typeof playerNames.get !== 'function') throw new TypeError('playerNames.get is required.');
@@ -30,6 +30,9 @@ function createTicketService({ repository, playerNames, authorization, audit, cl
     const record = await repository.get(input.ticketId);
     if (!record) throw new Error('Ticket not found.');
     if (record.guildId !== input.context.guildId) throw new Error('This operation is not authorized.');
+    if (channelConfig && !record.channelStatus) {
+      throw new Error('Use the legacy ticket management panel.');
+    }
     if (record.channelStatus) {
       const permitted = [record.channelId, channelConfig.channels.requests, channelConfig.channels.ticketLogs];
       if (!permitted.includes(input.context.channelId)) throw new Error('This operation is not authorized.');
@@ -76,8 +79,79 @@ function createTicketService({ repository, playerNames, authorization, audit, cl
     }
   }
 
+  function authorizeLegacy(context) {
+    authorization.authorize('tickets.moderate', context);
+    if (!channelConfig || context.guildId !== channelConfig.guildId
+      || context.channelId !== channelConfig.channels.ticketLogs) {
+      throw new Error('This operation is not authorized.');
+    }
+  }
+
+  async function getLegacy(input) {
+    authorizeLegacy(input.context);
+    const record = await repository.get(input.ticketId);
+    if (!record) throw new Error('Ticket not found.');
+    if (record.guildId !== input.context.guildId || record.channelStatus) {
+      throw new Error('This is not a legacy record-only ticket in this guild.');
+    }
+    return record;
+  }
+
+  async function applyAction(input, action) {
+    let record;
+    if (action === 'claim') {
+      record = await repository.claim(input.ticketId, input.context.actorId, clock());
+    } else if (action === 'complete') {
+      record = await repository.complete(input.ticketId, input.context.actorId, clock());
+    } else {
+      record = await repository.transition(input.ticketId,
+        action === 'close' ? [STATES.OPEN,STATES.CLAIMED] : [STATES.CLOSED],
+        action === 'close' ? STATES.CLOSED : STATES.OPEN,
+        { moderatorId:input.context.actorId, updatedAt:clock() });
+    }
+    const event = { claim:'claimed', complete:'completed', close:'closed', reopen:'reopened' }[action];
+    audit.write(`ticket.${event}`, record);
+    return action === 'close' || action === 'reopen'
+      ? syncAudited(record, action === 'close' ? 'archive' : 'reopen') : sync(record);
+  }
+
   return Object.freeze({
     connectChannels(value) { gateway = value; },
+    getLegacy,
+    async legacyControls(input) {
+      const record = await getLegacy(input);
+      if (!input.context.messageId || !interactionGuard) {
+        throw new Error('Message-bound legacy ticket controls are unavailable.');
+      }
+      const actions = record.state === STATES.CLOSED ? ['reopen']
+        : record.state === STATES.COMPLETED ? ['close']
+          : record.state === STATES.CLAIMED ? ['complete','close'] : ['claim','complete','close'];
+      const controls = await Promise.all(actions.map(async action => {
+        const session = await interactionGuard.issue({
+          ...input.context, feature:'legacy-tickets', action, requestId:record.id, ttlMs:120000
+        });
+        return { action, token:session.token };
+      }));
+      return { record, controls };
+    },
+    async legacyAction(input) {
+      authorizeLegacy(input.context);
+      if (!['claim','complete','close','reopen'].includes(input.action)
+        || !input.context.messageId || !interactionGuard) {
+        throw new Error('This legacy ticket control is no longer valid.');
+      }
+      const session = await interactionGuard.consume(input.token, {
+        ...input.context, action:input.action
+      });
+      if (session.feature !== 'legacy-tickets' || !session.request_id) {
+        throw new Error('This legacy ticket control is no longer valid.');
+      }
+      const bound = { ticketId:session.request_id, context:input.context };
+      return exclusive(bound.ticketId, async () => {
+        await getLegacy(bound);
+        return applyAction(bound, input.action);
+      });
+    },
     async create(input) {
       if (!TYPES.includes(input.type)) throw new TypeError('Unsupported ticket type.');
       if (channelConfig && (input.context.guildId !== channelConfig.guildId
@@ -136,17 +210,13 @@ function createTicketService({ repository, playerNames, authorization, audit, cl
       return exclusive(input.ticketId, async () => {
         if (channelConfig) await checked(input);
         else authorization.authorize('tickets.moderate', input.context);
-        const record = await repository.claim(input.ticketId, input.context.actorId, clock());
-        audit.write('ticket.claimed', record);
-        return sync(record);
+        return applyAction(input, 'claim');
       });
     },
     complete(input) {
       return exclusive(input.ticketId, async () => {
         await checked(input);
-        const record = await repository.complete(input.ticketId, input.context.actorId, clock());
-        audit.write('ticket.completed', record);
-        return sync(record);
+        return applyAction(input, 'complete');
       });
     },
     close(input) {
@@ -156,11 +226,7 @@ function createTicketService({ repository, playerNames, authorization, audit, cl
         else authorization.authorize('tickets.moderate', input.context);
         if (current && unsynced(current, true)) return syncAudited(current, 'archive');
         await preflight(current);
-        const record = await repository.transition(input.ticketId, [STATES.OPEN,STATES.CLAIMED], STATES.CLOSED, {
-          moderatorId:input.context.actorId, updatedAt:clock()
-        });
-        audit.write('ticket.closed', record);
-        return syncAudited(record, 'archive');
+        return applyAction(input, 'close');
       });
     },
     reopen(input) {
@@ -173,11 +239,7 @@ function createTicketService({ repository, playerNames, authorization, audit, cl
         }
         if (existing && unsynced(existing, false)) return syncAudited(existing, 'reopen');
         await preflight(existing);
-        const record = await repository.transition(input.ticketId, [STATES.CLOSED], STATES.OPEN, {
-          moderatorId:input.context.actorId, updatedAt:clock()
-        });
-        audit.write('ticket.reopened', record);
-        return syncAudited(record, 'reopen');
+        return applyAction(input, 'reopen');
       });
     },
     async recoverChannels() {

@@ -296,7 +296,7 @@ test('Debian launcher wires SQLite migrations and stops cleanly without external
   });
 
   try {
-    assert.equal(service.runtime.schemaVersion, 10);
+    assert.equal(service.runtime.schemaVersion, 11);
     assert(fs.existsSync(path.join(root, 'runtime', 'database.sqlite')));
     assert(fs.existsSync(path.join(root, 'runtime', 'backups')));
     assert(logs.some(line => line.includes('"type":"runtime.config"')));

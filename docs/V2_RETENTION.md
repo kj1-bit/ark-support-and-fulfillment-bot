@@ -28,5 +28,5 @@ Values are validated before any database access; unknown keys or out-of-range va
 ## Not purged automatically
 
 - Verified player-name and trusted-player identity associations: they are ongoing authorization state, not history. Remove them through an operator-reviewed process.
-- `tickets_v1_legacy` and other V1 archives, and database backups (retain according to the operator's backup policy).
+- `tickets_v1_legacy` and other V1 archives, and database backups (retain according to the operator's backup policy). The legacy ticket archive may hold V1 usernames, Discord IDs, and channel IDs indefinitely by design. Keep it through test and rollback validation; after production acceptance, make an explicit decision to retain, export, redact, or securely delete it. It is deliberately excluded from automatic retention.
 - Diagnostic logs, which are written to the process output and governed by the host's log rotation.

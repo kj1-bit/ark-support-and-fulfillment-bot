@@ -310,9 +310,9 @@ Exit criteria:
 ## Phase 10: CI and release controls
 
 - [ ] Add syntax and static validation.
-- [ ] Add unit, integration, security, compatibility, and recovery tests.
-- [ ] Add clean-install verification.
-- [ ] Add secret and private-value scanning.
+- [x] Add unit, integration, security, compatibility, and recovery tests. (CI runs the full suite plus the security, persistence, runtime, and hardening suites.)
+- [x] Add clean-install verification. (CI installs with `npm ci` on a clean runner.)
+- [ ] Add secret and private-value scanning. (Partial: CI rejects tracked `.env`, SQLite, runtime, backup, and log files; file contents are not scanned.)
 - [ ] Add dependency and install-script review.
 - [ ] Add catalog-schema validation and catalog-change reporting to CI.
 - [ ] Add protected-branch and pull-request controls.
@@ -397,11 +397,11 @@ A creature catalog update is acceptable only when:
 ## Current checkpoint
 
 - Date: 2026-11-07
-- PR: [#17](https://github.com/kj1-bit/ark-support-and-fulfillment-bot/pull/17), merged to `main` as `a7412ef536ca45d4ef52c3264e8d41d5199c7179`
+- PRs: [#17](https://github.com/kj1-bit/ark-support-and-fulfillment-bot/pull/17) (runtime) merged as `a7412ef536ca45d4ef52c3264e8d41d5199c7179`; [#18](https://github.com/kj1-bit/ark-support-and-fulfillment-bot/pull/18) (Debian launcher) merged as `82f6874cda6943533aec50191e857d72d7ce02aa`
 - V2 test baseline tag: `v2-test-baseline-2026-11-07`
 - Milestone: V2 runtime review remediation
-- Database schema version: 10
-- Status: PR #17 is merged. V2 now has a standalone launcher at `scripts/start-v2.js`; Debian and external test-endpoint rehearsal remain outstanding. The root `index.js` remains the V1 entrypoint. See the [V2 guide](V2_GUIDE.md) and [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for current operator guidance and test acceptance steps.
+- Database schema version: 11
+- Status: PRs #17 and #18 are merged. V2 now has a standalone launcher at `scripts/start-v2.js`; Debian and external test-endpoint rehearsal remain outstanding. The root `index.js` remains the V1 entrypoint. See the [V2 guide](V2_GUIDE.md) and [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for current operator guidance and test acceptance steps.
 
 ### Current implementation
 
@@ -414,12 +414,13 @@ A creature catalog update is acceptable only when:
 - Enabled features require their staff roles and channels before backup or migrations begin.
 - Slash-command deployment defaults to a reviewed dry run, uses the validated Discord application ID, updates only managed commands, and aborts when the command list changes during review.
 - A scheduled retention service purges expired sessions, old tickets, completed PIN requests, operational events, and old fulfillment audit rows, and anonymizes terminal fulfillment identities. Expired PIN requests no longer block re-requesting, and interrupted fulfillment is reconciled on startup.
-- Enabled PINs require `PIN_PROTECTION_KEY` during configuration validation outside mock mode.
+- Enabled PINs require `PIN_PROTECTION_KEY` during configuration validation outside mock mode; the launcher also requires a valid key in every mode before opening SQLite.
+- Schema version 11 adds `CHECK` constraints for fulfillment, interaction-session, and catalog states (rebuilt after verifying existing rows) and removes the unused `trusted_identity_associations` table from migration 008 (non-empty tables are archived, never dropped). `trusted_players` is the only trusted-identity table. The migration runner requires recorded history to be a contiguous prefix of this release's migrations with matching names. Malformed persisted fulfillment result JSON no longer prevents a request from loading (`results` is omitted and `resultsCorrupt` is set).
 - `scripts/start-v2.js` wires the runtime to SQLite, the content-fingerprinted checked-in catalog, the Discord adapter, and the mode-specific RCON transport. Mock-mode launcher integration is tested; no Debian or external test-service deployment has been performed.
 
 ### Verification
 
-- Full automated suite after Debian launcher review fixes: 185 tests passed, 0 failed.
+- Full automated suite after schema-integrity fixes: 190 tests passed, 0 failed.
 - Creature catalog validation and reviewed catalog coverage: passed.
 - Public example configuration validation: passed.
 - `git diff --check`: passed.

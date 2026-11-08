@@ -54,6 +54,8 @@ When `features.dashboards` is enabled, `staff`, `ticketLogs`, `pinsDashboard`, a
 
 Schema version 10 redacts legacy fulfillment operation results during migration. The runtime now stores only a bounded operation index and success flag; raw transport output and command details are excluded.
 
+Schema version 11 adds database-level state constraints to `fulfillment_requests`, `interaction_sessions`, and `catalog_versions` and removes the unused `trusted_identity_associations` table (a non-empty one is renamed `trusted_identity_associations_archive` instead of dropped). The migration first checks that every existing row has a supported state and aborts, rolling back unchanged, if any does. The migration runner also refuses to start when recorded migration history has gaps or version/name pairs that differ from the release.
+
 Retention and cleanup are configured with the optional `retention` section and described in `docs/V2_RETENTION.md`. The runtime also reconciles interrupted fulfillment requests (`CLAIMED` to `FAILED`, `EXECUTING` to `UNCERTAIN`) before Discord connects, so a restart after a crash leaves no request stuck mid-flow.
 
 The V2 runtime migration keeps the legacy V1 ticket table intact by renaming it to `tickets_v1_legacy` before creating the V2 `tickets` table; if that archive name is already occupied, migration fails and rolls back without changing ticket data. This preserves legacy ticket data but does not make V1 able to use the migrated database. Keep the pre-migration backup until the updated runtime and historical ticket data have been verified. A rollback to V1 must restore that backup before starting V1 because its handlers expect the original `tickets` table shape.

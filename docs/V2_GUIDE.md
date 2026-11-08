@@ -24,7 +24,7 @@ V2 separates Discord presentation from application rules and persistence:
 4. **Repositories** persist tickets, trusted player associations, PIN requests, fulfillment requests, interaction sessions, catalog versions, log events, and dashboard message IDs.
 5. **Adapters** contain Discord and SQLite boundaries and an allowlisted RCON operation service. `scripts/start-v2.js` supplies the concrete runtime wiring; the [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) describes isolated staging and remaining operational validation.
 
-The current SQLite schema version is **10**. Migrations are ordered and transactional. Runtime composition backs up an existing database before migration. Migration 004 preserves the legacy V1 `tickets` table as `tickets_v1_legacy`; it does not convert V1 ticket records into V2 tickets. Keep the pre-migration backup and restore it before rolling V1 back onto a migrated database.
+The current SQLite schema version is **11**. Migrations are ordered and transactional. Runtime composition backs up an existing database before migration. Migration 004 preserves the legacy V1 `tickets` table as `tickets_v1_legacy`; it does not convert V1 ticket records into V2 tickets. Keep the pre-migration backup and restore it before rolling V1 back onto a migrated database.
 
 ## Feature guide
 
@@ -109,7 +109,7 @@ Do not run `--apply` against a live application as part of setup or source merge
 
 ## Persistence, privacy, and recovery
 
-- The runtime uses SQLite and ordered migrations through schema version 10. The launcher creates private database and backup paths; production paths must remain outside the source checkout.
+- The runtime uses SQLite and ordered migrations through schema version 11. Startup refuses a database whose recorded migration history has gaps or names that do not match this release. The launcher creates private database and backup paths; production paths must remain outside the source checkout.
 - Before migration, runtime composition checks integrity and calls the configured backup provider. A V1 `tickets` table is archived, not converted. Preserve the backup separately.
 - PIN material is encrypted at rest, cleared after delivery/cancellation/expiration, and never included in the normal audit record.
 - Fulfillment stores only bounded operation summaries (`success` and operation index), not raw RCON output or commands. If a pair delivery partially succeeds, the saved operation results remain available for staff review.

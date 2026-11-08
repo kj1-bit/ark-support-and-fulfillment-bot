@@ -73,10 +73,10 @@ test('composition failure occurs before Discord adapter construction',async()=>{
   assert(db.calls.includes('close'));
 });
 
-test('Discord receives narrow services without database or transport',async()=>{
-  const db=fakeDatabase(); let received;
+test('Discord receives narrow services and environment without database or transport',async()=>{
+  const db=fakeDatabase(); let received;const env={DISCORD_TOKEN:'test-token'};
   const result=await startV2({
-    loadConfig:()=>frozenConfig(), openDatabase:async()=>db,
+    loadConfig:()=>frozenConfig(), openDatabase:async()=>db,env,
     composeRuntime:async()=>({authorization:{},interactionGuard:{},fulfillment:{},audit:{}}),
     createDiscordAdapter:async input=>{received=input;return {start:async()=>{}};}
   });
@@ -100,6 +100,7 @@ test('Discord receives narrow services without database or transport',async()=>{
   );
   assert(!('database' in received.services));
   assert(!('transport' in received.services));
+  assert.equal(received.env,env);
   assert.equal(result.database,db);
 });
 

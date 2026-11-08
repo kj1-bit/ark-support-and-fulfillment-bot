@@ -47,3 +47,7 @@ For this source-only checkpoint, restoring commit `21de487` returns the reposito
 Removing `/updatebot` intentionally removes one V1 administrative workflow. All player, ticket, PIN, shop, panel, fulfillment, database, mock-mode, and RCON behaviors remain otherwise unchanged by this checkpoint.
 
 Existing installations must remove `UPDATE_SCRIPT_PATH` from private environment files and rerun `node deploy-commands.js` during a reviewed deployment so Discord's global command registration no longer includes `/updatebot`.
+
+Run `node scripts/deploy-v2-commands.js` during the reviewed deployment with `DISCORD_TOKEN`, `CLIENT_ID`, and a valid V2 runtime configuration available. The script deploys commands for enabled V2 features, replaces only its managed command names, and preserves other registered global commands.
+
+The V2 runtime migration keeps the legacy V1 ticket table intact by renaming it to `tickets_v1_legacy` before creating the V2 `tickets` table; if that archive name is already occupied, migration fails and rolls back without changing ticket data. Keep the pre-migration backup until the updated runtime and historical ticket data have been verified. A rollback to V1 must restore that backup before starting V1 because its handlers expect the original `tickets` table shape.

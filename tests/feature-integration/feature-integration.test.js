@@ -22,7 +22,7 @@ test('Discord adapter registers fulfillment through the feature manager', async 
     login: async token => calls.push(['login', token]),
     destroy: async () => calls.push(['destroy'])
   };
-  const adapter = createDiscordAdapter({client,config:{features:{fulfillment:true},discord:{token:'secret'}},services:services()});
+  const adapter = createDiscordAdapter({client,config:{features:{fulfillment:true},discord:{tokenSecret:'DISCORD_TOKEN'}},env:{DISCORD_TOKEN:'secret'},services:services()});
   assert.deepEqual(adapter.featureNames, ['fulfillment']);
   await adapter.start();
   await adapter.stop();
@@ -32,7 +32,7 @@ test('Discord adapter registers fulfillment through the feature manager', async 
 test('disabled features cause no listener, login, or destroy activity', async () => {
   const calls = [];
   const client = {on:()=>calls.push('on'),off:()=>calls.push('off'),login:async()=>calls.push('login'),destroy:async()=>calls.push('destroy')};
-  const adapter = createDiscordAdapter({client,config:{features:{fulfillment:false},discord:{token:'secret'}},services:{}});
+  const adapter = createDiscordAdapter({client,config:{features:{fulfillment:false},discord:{tokenSecret:'DISCORD_TOKEN'}},env:{},services:{}});
   assert.deepEqual(adapter.featureNames, []);
   await adapter.start();
   await adapter.stop();
@@ -47,7 +47,7 @@ test('login failure cleans up registered feature listener', async () => {
     login:async()=>{throw new Error('login failed');},
     destroy:async()=>calls.push(['destroy'])
   };
-  const adapter=createDiscordAdapter({client,config:{features:{fulfillment:true},discord:{token:'secret'}},services:services()});
+  const adapter=createDiscordAdapter({client,config:{features:{fulfillment:true},discord:{tokenSecret:'DISCORD_TOKEN'}},env:{DISCORD_TOKEN:'secret'},services:services()});
   await assert.rejects(()=>adapter.start(),/login failed/);
   assert.deepEqual(calls.map(x=>x[0]),['on','off']);
 });
@@ -55,7 +55,7 @@ test('login failure cleans up registered feature listener', async () => {
 test('adapter stop is idempotent before start and after shutdown', async () => {
   const calls=[];
   const client={on:()=>{},off:()=>{},login:async()=>{},destroy:async()=>calls.push('destroy')};
-  const adapter=createDiscordAdapter({client,config:{features:{fulfillment:true},discord:{token:'secret'}},services:services()});
+  const adapter=createDiscordAdapter({client,config:{features:{fulfillment:true},discord:{tokenSecret:'DISCORD_TOKEN'}},env:{DISCORD_TOKEN:'secret'},services:services()});
   await adapter.stop();
   await adapter.start();
   await adapter.stop();

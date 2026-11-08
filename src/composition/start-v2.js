@@ -23,6 +23,7 @@ async function startV2(options = {}) {
     runtime = await compose({ ...options, config, database });
     discord = await options.createDiscordAdapter({
       config,
+      env: options.env || process.env,
       services:Object.freeze({
         authorization: runtime.authorization,
         interactionGuard: runtime.interactionGuard,

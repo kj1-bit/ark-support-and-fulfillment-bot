@@ -33,4 +33,12 @@ jobs:
       - name: Reject tracked secrets and runtime data
         shell: bash
         run: |
-          ! git ls-files | grep -E '(^|/)(\.env([^/]*)?|.*\.sqlite3?|database-.*|backups/|logs/)'
+          forbidden="$(
+            git ls-files |
+            grep -E '(^|/)\.env($|\.)|\.sqlite3?($|-(wal|shm|backup)$)|(^|/)(runtime|backups|logs)/' |
+            grep -vE '^\.env\.example$' || true
+          )"
+          if [ -n "$forbidden" ]; then
+            printf 'Tracked secret or runtime-data files found:\n%s\n' "$forbidden"
+            exit 1
+          fi

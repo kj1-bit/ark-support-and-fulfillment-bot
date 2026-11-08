@@ -38,7 +38,7 @@ The V2 validator never infers a mode from V1's `ARK_RCON_MOCK` flag. Always set 
 
 `discord.tokenSecret` and `ark.servers[].passwordSecret` are environment-variable names. Runtime adapters resolve their values at the boundary. The command registration script specifically requires `DISCORD_TOKEN` and uses `discord.clientId` as the application ID.
 
-When `features.pins` is enabled in `test` or `production`, the host must also provide `PIN_PROTECTION_KEY`: base64-encoded key material decoding to exactly 32 bytes. The launcher requires a valid key in mock mode as well whenever PINs are enabled, and rejects a malformed key before SQLite is opened. Keep it separate from the JSON configuration and all other credentials. Loss of this key prevents decryption of pending PIN requests.
+When `features.pins` is enabled in `test` or `production`, the host must also provide `PIN_PROTECTION_KEY`: base64-encoded key material decoding to exactly 32 bytes. The launcher requires a valid key in mock mode as well whenever PINs are enabled, and rejects a malformed key before SQLite is opened. Keep it separate from the JSON configuration and all other credentials. Loss of this key prevents decryption of pending PIN requests and persistent generated Vault PINs. Generated PINs remain encrypted for repeated private DM retrieval; do not replace this key without an operator-reviewed re-encryption procedure.
 
 Never put secret values in tracked JSON, `.env.example`, command arguments, screenshots, issue reports, or logs. Store test and production secrets separately.
 
@@ -48,14 +48,24 @@ Configuration validation happens before the V2 database opener is called. The la
 
 - Shared and feature-specific staff/moderator role IDs and channel IDs.
 - `tickets` and `pins` dependencies on enabled `playerNames`.
+- A non-null `discord.channels.ticketCategory` when tickets are enabled. This existing field is shown in the example; it now controls private per-request channels. Ticket creation validates that it is a category in the configured guild.
+- `discord.channels.requests` for shop search panels, including when tickets are disabled.
 - Required server availability for `fulfillment`.
 - Presence of Discord, RCON, and PIN-protection secrets in non-mock modes; the launcher also checks that the Discord token exists before opening SQLite whenever a feature is enabled in mock mode.
 - Retention keys, bounds, and the requirement that fulfillment identity retention not exceed fulfillment audit retention.
 
 Runtime composition repeats critical authorization requirements before backup and migrations. This protects startup against incomplete or invalid runtime options as well.
 
+## Discord permissions and standing panels
+
+The enabled features restore V1-style request, Vault, IGN, fulfillment, and inline log panels using persisted message IDs. The bot requires access to send/read/edit panel messages and Manage Channels for private ticket creation, overwrite updates, and retention deletion. The request panel's shop button appears only when `shop` is enabled.
+
+Keep `ticketLogs`, `pinsDashboard`, and `fulfillmentLogs` staff-only. Inline dashboard rendering fails with a generic audit notice if ordinary roles can view the channel or permissions cannot be verified; it never silently publishes an ephemeral replacement. Staff interaction authorization remains required for paging.
+
+With `pins` enabled, turn on **Server Members Intent** in the test application's Developer Portal. The launcher requests Guild Members only for that feature so **Generate Missing PINs** can enumerate eligible members. This does not grant PINs to unverified users or reveal them publicly.
+
 ## Important distinction
 
-`schemaVersion` in the JSON file is currently `1`. The SQLite database schema is a separate version, currently `10`. Do not edit either number to migrate an installation. Schema migrations are code-controlled and run through the V2 runtime composition; they should first be exercised against a disposable copy of the database with a verified backup.
+`schemaVersion` in the JSON file remains `1`. The SQLite database schema is a separate version, currently `13`. Do not edit either number to migrate an installation. Migrations 012 (private ticket metadata/counter) and 013 (generated Vault PINs) are additive and run through runtime composition; first exercise them against a disposable copy of the existing V2 database with a verified backup. Existing record-only tickets are retained rather than creating channels retroactively.
 
 Configuration validity does not mean that a live/test deployment is accepted. `scripts/start-v2.js` wires the runtime dependencies, but test application/server connectivity, Debian service installation, and the isolated acceptance checklist still require operator verification.

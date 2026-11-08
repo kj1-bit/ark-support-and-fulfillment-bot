@@ -92,6 +92,18 @@ test('default Discord client can observe message deletions of uncached panels', 
   }
 });
 
+test('Guild Members intent is requested only for enabled PIN bulk generation', () => {
+  const enabled = createDefaultDiscordClient({ config:{ features:{ pins:true } } });
+  const disabled = createDefaultDiscordClient({ config:{ features:{ pins:false } } });
+  try {
+    assert(enabled.options.intents.has(GatewayIntentBits.GuildMembers));
+    assert(!disabled.options.intents.has(GatewayIntentBits.GuildMembers));
+  } finally {
+    void enabled.destroy();
+    void disabled.destroy();
+  }
+});
+
 test('launcher requires the PIN protection key before SQLite opens when PINs are enabled', () => {
   const config = { discord: { tokenSecret: 'DISCORD_TOKEN' }, features: { pins: true } };
   const options = createLauncherOptions({ env: { DISCORD_TOKEN: 'token' }, loadConfig: () => config });
@@ -296,7 +308,7 @@ test('Debian launcher wires SQLite migrations and stops cleanly without external
   });
 
   try {
-    assert.equal(service.runtime.schemaVersion, 11);
+    assert.equal(service.runtime.schemaVersion, 13);
     assert(fs.existsSync(path.join(root, 'runtime', 'database.sqlite')));
     assert(fs.existsSync(path.join(root, 'runtime', 'backups')));
     assert(logs.some(line => line.includes('"type":"runtime.config"')));

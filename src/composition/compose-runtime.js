@@ -12,12 +12,14 @@ const { createPlayerNameService } = require('../domain/player-names/player-name-
 const { createTicketService } = require('../domain/tickets/ticket-service');
 const { createCatalogSearchService } = require('../domain/shop/catalog-search-service');
 const { createPinService } = require('../domain/pins/pin-service');
+const { createVaultPinService } = require('../domain/pins/vault-pin-service');
 const { createSqliteFulfillmentRepository } = require('../adapters/sqlite/fulfillment-repository');
 const { createSqliteSessionRepository } = require('../adapters/sqlite/session-repository');
 const { createSqlitePlayerRepository } = require('../adapters/sqlite/player-repository');
 const { createSqlitePlayerNameRepository } = require('../adapters/sqlite/player-name-repository');
 const { createSqliteTicketRepository } = require('../adapters/sqlite/ticket-repository');
 const { createSqlitePinRepository } = require('../adapters/sqlite/pin-repository');
+const { createSqliteVaultPinRepository } = require('../adapters/sqlite/vault-pin-repository');
 const { createSqliteCatalogStore } = require('../adapters/sqlite/catalog-store');
 const { createSqliteOperationalEventRepository } = require('../adapters/sqlite/operational-event-repository');
 const { createSqlitePanelRepository } = require('../adapters/sqlite/panel-repository');
@@ -39,6 +41,8 @@ const migration008 = require('../migrations/008-trusted-identity-associations');
 const migration009 = require('../migrations/009-discord-panels');
 const migration010 = require('../migrations/010-fulfillment-result-redaction');
 const migration011 = require('../migrations/011-schema-integrity');
+const migration012 = require('../migrations/012-ticket-channels');
+const migration013 = require('../migrations/013-vault-pins');
 const { checkIntegrity } = require('../recovery/database-recovery');
 
 function buildAuthorizationOptions(config) {
@@ -66,6 +70,10 @@ function buildAuthorizationOptions(config) {
     });
   }
   if (enabled.tickets === true) {
+    capabilities['tickets.channel-moderate'] = Object.freeze({
+      roleIds:Object.freeze([staff]),
+      channelIds:Object.freeze([])
+    });
     capabilities['tickets.moderate'] = Object.freeze({
       roleIds: Object.freeze([staff]),
       channelIds: Object.freeze([
@@ -84,7 +92,10 @@ function buildAuthorizationOptions(config) {
     });
     capabilities['pins.deliver'] = Object.freeze({
       roleIds: Object.freeze([staff]),
-      channelIds: Object.freeze([requireId(channels.vault, 'discord.channels.vault')])
+      channelIds: Object.freeze([
+        requireId(channels.vault, 'discord.channels.vault'),
+        requireId(channels.pinsDashboard, 'discord.channels.pinsDashboard')
+      ])
     });
   }
   if (enabled.dashboards === true) {
@@ -134,7 +145,7 @@ async function composeRuntime(options = {}) {
     database,
     migrations: [
       migration001, migration002, migration003, migration004, migration005,
-      migration006, migration007, migration008, migration009, migration010, migration011
+      migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013
     ],
     clock
   }).run();
@@ -179,6 +190,11 @@ async function composeRuntime(options = {}) {
   });
   const dashboardsBase = createDashboardService({ events: operationalEvents });
   const dashboards = Object.freeze({
+    // Startup rendering has no human actor; the Discord adapter verifies staff-only visibility.
+    snapshot(key, page) {
+      if (!['tickets','pins','fulfillment'].includes(key)) throw new TypeError('Unsupported dashboard panel.');
+      return dashboardsBase[key]({ page });
+    },
     tickets(input) {
       authorization.authorize('dashboards.view', input.context);
       return dashboardsBase.tickets(input);
@@ -226,11 +242,27 @@ async function composeRuntime(options = {}) {
     authorization,
     audit,
     clock,
-    uuid: randomUUID
+    uuid: randomUUID,
+    channelConfig:config.features.tickets ? config.discord : null
   });
   const pinRepository = createSqlitePinRepository(database);
   const pins = pinProtector
     ? createPinService({ repository: pinRepository, playerNames, authorization, protector: pinProtector, audit, clock, uuid: randomUUID })
+    : null;
+  const vaultPinRepository = createSqliteVaultPinRepository(database);
+  const vaultPins = pinProtector
+    ? createVaultPinService({
+      repository: vaultPinRepository,
+      playerNames,
+      protector: pinProtector,
+      authorization,
+      audit,
+      clock,
+      guildId: config.discord.guildId,
+      vaultChannelId: config.discord.channels.vault,
+      dashboardChannelId: config.discord.channels.pinsDashboard,
+      eligibleRoleIds: config.discord.roles.member ? [config.discord.roles.member, config.discord.roles.staff] : []
+    })
     : null;
 
   const catalogStore = createSqliteCatalogStore(database, { clock });
@@ -256,7 +288,9 @@ async function composeRuntime(options = {}) {
   });
 
   const retention = createRetentionService({
-    repository: createSqliteRetentionRepository(database),
+    repository: createSqliteRetentionRepository(database, {
+      beforePurgeClosedTickets:config.features.tickets ? cutoff => tickets.purgeChannels(cutoff) : null
+    }),
     policy: config.retention,
     audit,
     clock
@@ -277,6 +311,8 @@ async function composeRuntime(options = {}) {
     ticketRepository,
     pins,
     pinRepository,
+    vaultPins,
+    vaultPinRepository,
     shop,
     dashboards,
     dashboardPanels,

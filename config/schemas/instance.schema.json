@@ -15,6 +15,32 @@
     "features": { "$ref": "#/$defs/features" },
     "retention": { "$ref": "#/$defs/retention" }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "features": { "properties": { "tickets": { "const": true } } } } },
+      "then": {
+        "properties": {
+          "discord": {
+            "properties": {
+              "channels": { "properties": { "ticketCategory": { "$ref": "#/$defs/snowflake" } } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "features": { "properties": { "shop": { "const": true } } } } },
+      "then": {
+        "properties": {
+          "discord": {
+            "properties": {
+              "channels": { "properties": { "requests": { "$ref": "#/$defs/snowflake" } } }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "retention": {
       "type": "object",
@@ -68,7 +94,10 @@
       "additionalProperties": false,
       "required": ["ticketCategory", "vault", "requests", "playerNames", "pinsDashboard", "ticketLogs", "fulfillment", "fulfillmentLogs"],
       "properties": {
-        "ticketCategory": { "$ref": "#/$defs/nullableSnowflake" },
+        "ticketCategory": {
+          "$ref": "#/$defs/nullableSnowflake",
+          "description": "Guild category for private per-request channels; non-null when tickets are enabled."
+        },
         "vault": { "$ref": "#/$defs/nullableSnowflake" },
         "requests": { "$ref": "#/$defs/nullableSnowflake" },
         "playerNames": { "$ref": "#/$defs/nullableSnowflake" },

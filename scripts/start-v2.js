@@ -21,10 +21,13 @@ function createAuditSink(write = console.info) {
   return event => write(JSON.stringify(event));
 }
 
-function createDefaultDiscordClient() {
+function createDefaultDiscordClient({ config } = {}) {
   // Panel self-healing relies on messageDelete, which needs GuildMessages and a partial for uncached messages.
   return new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+    intents: [
+      GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages,
+      ...(config?.features.pins ? [GatewayIntentBits.GuildMembers] : [])
+    ],
     partials: [Partials.Message]
   });
 }
@@ -96,7 +99,7 @@ function createLauncherOptions(options = {}) {
     },
     createDiscordAdapter: async ({ config, services }) => {
       const { createDiscordAdapter } = require('../src/adapters/discord/adapter');
-      const client = createClient();
+      const client = createClient({ config });
       if (typeof client.once === 'function') {
         client.once(Events.ClientReady, () => write(JSON.stringify({ type: 'runtime.discord.ready' })));
       }

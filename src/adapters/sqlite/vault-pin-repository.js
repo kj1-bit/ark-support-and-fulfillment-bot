@@ -1,0 +1,37 @@
+'use strict';
+
+const SELECT = `SELECT guild_id AS guildId, user_id AS userId, protected_pin AS protectedPin, source,
+  created_at AS createdAt, updated_at AS updatedAt, last_delivered_at AS lastDeliveredAt
+  FROM vault_pins WHERE guild_id = ? AND user_id = ?`;
+
+function createSqliteVaultPinRepository(database) {
+  if (!database || typeof database.run !== 'function' || typeof database.get !== 'function'
+    || typeof database.all !== 'function') {
+    throw new TypeError('database run/get/all interface is required.');
+  }
+  const get = (guildId, userId) => database.get(SELECT, [guildId, userId]);
+  return Object.freeze({
+    get,
+    async insertIfAbsent(record) {
+      const result = await database.run(
+        `INSERT INTO vault_pins (guild_id, user_id, protected_pin, source, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(guild_id, user_id) DO NOTHING`,
+        [record.guildId, record.userId, record.protectedPin, record.source, record.createdAt, record.updatedAt]
+      );
+      return Object.freeze({ created: result.changes === 1, record: await get(record.guildId, record.userId) });
+    },
+    async listUserIds(guildId) {
+      const rows = await database.all('SELECT user_id AS userId FROM vault_pins WHERE guild_id = ?', [guildId]);
+      return rows.map(row => row.userId);
+    },
+    async markDelivered(guildId, userId, at) {
+      const result = await database.run(
+        'UPDATE vault_pins SET last_delivered_at = ?, updated_at = ? WHERE guild_id = ? AND user_id = ?',
+        [at, at, guildId, userId]
+      );
+      return result.changes === 1;
+    }
+  });
+}
+
+module.exports = { createSqliteVaultPinRepository };

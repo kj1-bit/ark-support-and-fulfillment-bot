@@ -17,6 +17,8 @@ function makeInteraction(commandName, subcommand, values = {}) {
     member: { roleIds: [] },
     deferred: false,
     replied: false,
+    deferReply: async function () { this.deferred = true; },
+    editReply: async payload => replies.push(payload),
     isChatInputCommand: () => true,
     isButton: () => false,
     isModalSubmit: () => false,
@@ -45,11 +47,19 @@ function makeAdapter(overrides = {}) {
     }
   };
   const services = {
+    authorization: { authorize() {} },
+    interactionGuard: {},
+    fulfillment: {},
+    onlinePlayers: {},
+    catalogManager: {},
+    dashboardPanels: { get: async () => null, save: async () => {} },
     playerNames: {
       submit: async input => { calls.playerName = input; return { id: 'p', state: 'PENDING' }; },
       verify: async () => ({ id: 'p', state: 'VERIFIED' })
     },
     tickets: {
+      connectChannels() {},
+      recoverChannels: async () => {},
       create: async input => { calls.ticket = input; return { id: 't', state: 'OPEN' }; },
       claim: async () => ({ id: 't', state: 'CLAIMED' }),
       close: async () => ({ id: 't', state: 'CLOSED' }),
@@ -71,7 +81,10 @@ function makeAdapter(overrides = {}) {
     client,
     config: {
       features: { playerNames: true, tickets: true, pins: true, shop: true },
-      discord: { tokenSecret: 'DISCORD_TOKEN' }
+      discord: { tokenSecret: 'DISCORD_TOKEN', guildId: '10000000000000002',
+        roles: { staff: '10000000000000005' },
+        channels: { playerNames: '10000000000000003', requests: '10000000000000006',
+          ticketLogs: '10000000000000007', ticketCategory: '10000000000000008' } }
     },
     env: { DISCORD_TOKEN: 'test-token' },
     services,

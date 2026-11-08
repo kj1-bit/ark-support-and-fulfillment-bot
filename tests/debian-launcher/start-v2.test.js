@@ -101,6 +101,43 @@ test('launcher requires the PIN protection key before SQLite opens when PINs are
   );
 });
 
+test('malformed PIN protection keys fail before SQLite or any runtime directory is created', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ticketbot-v2-pinkey-'));
+  const configPath = path.join(root, 'instance.json');
+  const example = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../config/examples/instance.example.json'), 'utf8'));
+  example.storage = { databasePath: 'runtime/database.sqlite', backupPath: 'runtime/backups' };
+  fs.writeFileSync(configPath, JSON.stringify(example));
+  const badKey = 'not-a-valid-key-but-long-enough-to-pass-a-length-check-0123456789';
+  const logs = [];
+  let opened = false;
+  const errors = [];
+
+  try {
+    for (const key of [badKey, Buffer.alloc(16, 7).toString('base64').padEnd(44, 'A')]) {
+      await assert.rejects(
+        startV2Service({
+          sourceRoot: root,
+          configPath,
+          env: { DISCORD_TOKEN: 'token', PIN_PROTECTION_KEY: key },
+          write: line => logs.push(line),
+          sqlite3: { Database: function Database() { opened = true; } }
+        }),
+        error => {
+          errors.push(error);
+          return error.code === 'CONFIGURATION_INVALID';
+        }
+      );
+      assert.equal(opened, false);
+      assert.equal(fs.existsSync(path.join(root, 'runtime')), false);
+      const visible = JSON.stringify(errors.at(-1).issues) + logs.join('\n');
+      assert(!visible.includes(key));
+      assert(errors.at(-1).issues.some(issue => issue.includes('PIN_PROTECTION_KEY')));
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('production storage paths are checked against the source root, not the working directory', () => {
   const config = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../config/examples/instance.example.json'), 'utf8'));
   config.runtime.mode = 'production';

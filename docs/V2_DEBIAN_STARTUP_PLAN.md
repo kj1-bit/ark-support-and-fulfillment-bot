@@ -59,7 +59,7 @@ These are proposed paths, not paths created by this repository. Before adopting 
 2. Install from the committed lockfile with the approved install scripts, using the supported Node/npm versions. Build or native-module verification steps must be explicit in the release instructions if required.
 3. Place the private JSON configuration at `/etc/ticketbot-v2/instance.json` and secrets in the approved environment file/provider. Keep credentials out of command history and process arguments. Set `TICKETBOT_CONFIG_PATH=/etc/ticketbot-v2/instance.json`.
 4. Set `runtime.mode` to `test`. Point `discord` at the test application/guild, `ark.servers` only at the test ARK server, and `storage` only at the V2 test directories.
-5. Ensure `DISCORD_TOKEN` exists whenever any Discord feature is enabled, and `PIN_PROTECTION_KEY` exists whenever PINs are enabled, including in mock mode (the launcher checks both before opening SQLite). In `test` mode also provide configured test RCON secrets. The PIN key is base64 for exactly 32 bytes and must be retained securely for the lifetime of encrypted pending PINs.
+5. Ensure `DISCORD_TOKEN` exists whenever any Discord feature is enabled, and `PIN_PROTECTION_KEY` exists and is valid (base64 decoding to exactly 32 bytes) whenever PINs are enabled, including in mock mode (the launcher checks both before opening SQLite). In `test` mode also provide configured test RCON secrets. The PIN key is base64 for exactly 32 bytes and must be retained securely for the lifetime of encrypted pending PINs.
 6. Validate the private file and run the complete checks from the staged release:
 
    ```sh

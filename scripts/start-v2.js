@@ -13,6 +13,7 @@ const { startV2 } = require('../src/composition/start-v2');
 const { loadInitialCatalog } = require('../src/composition/load-initial-catalog');
 const { loadConfig } = require('../src/config');
 const { ConfigurationError } = require('../src/config/configuration-error');
+const { decodeKey } = require('../src/security/pin-protector');
 
 const SOURCE_ROOT = path.resolve(__dirname, '..');
 
@@ -46,8 +47,16 @@ function createLauncherOptions(options = {}) {
         && !env[config.discord.tokenSecret]) {
         issues.push('configuration.discord.tokenSecret: required secret is not present when Discord features are enabled');
       }
-      if (config.features.pins === true && !env.PIN_PROTECTION_KEY) {
-        issues.push('configuration.features.pins: required PIN_PROTECTION_KEY secret is not present');
+      if (config.features.pins === true) {
+        if (!env.PIN_PROTECTION_KEY) {
+          issues.push('configuration.features.pins: required PIN_PROTECTION_KEY secret is not present');
+        } else {
+          try {
+            decodeKey(env.PIN_PROTECTION_KEY);
+          } catch {
+            issues.push('configuration.features.pins: PIN_PROTECTION_KEY must be a non-example base64 value decoding to exactly 32 bytes');
+          }
+        }
       }
       if (issues.length) throw new ConfigurationError(issues);
       return config;

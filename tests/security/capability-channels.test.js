@@ -1,0 +1,4 @@
+'use strict';const test=require('node:test');const assert=require('node:assert/strict');const {buildAuthorizationOptions}=require('../../src/composition/compose-runtime');
+const id=n=>`1000000000000000${n}`;
+function config(){return {discord:{guildId:id(1),roles:{staff:id(2),fulfillmentModerator:id(3)},channels:{fulfillment:id(4),fulfillmentLogs:id(5),playerNames:id(6),requests:id(7),ticketLogs:id(8),vault:id(9),pinsDashboard:id(10)}}};}
+test('capabilities use feature-specific channel sets',()=>{const c=buildAuthorizationOptions(config()).capabilities;assert.deepEqual(c['fulfillment.confirm'].channelIds,[id(4)]);assert.deepEqual(c['player-names.verify'].channelIds,[id(6)]);assert.deepEqual(c['tickets.moderate'].channelIds,[id(7),id(8)]);assert.deepEqual(c['pins.moderate'].channelIds,[id(9),id(10)]);assert.deepEqual(c['dashboards.view'].channelIds,[id(5),id(8),id(10)]);});

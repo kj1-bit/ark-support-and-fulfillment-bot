@@ -25,7 +25,8 @@ function createPinService({
   ttlMs = 86400000
 }) {
   if (!repository || typeof repository.create !== 'function'
-    || typeof repository.get !== 'function' || typeof repository.transition !== 'function') {
+    || typeof repository.get !== 'function' || typeof repository.transition !== 'function'
+    || typeof repository.expireStale !== 'function') {
     throw new TypeError('PIN repository interface is required.');
   }
   if (!playerNames || typeof playerNames.get !== 'function') throw new TypeError('playerNames.get is required.');
@@ -42,6 +43,7 @@ function createPinService({
       if (!player || player.status !== 'VERIFIED') throw new Error('A verified player name is required.');
       const protectedPin = await protector.protect(validatePin(input.pin));
       const now = clock();
+      await repository.expireStale(input.context.actorId, now);
       const record = await repository.create({
         id: `PIN-${uuid()}`,
         actorId: input.context.actorId,
@@ -60,6 +62,8 @@ function createPinService({
 
     async approve(input) {
       authorization.authorize('pins.moderate', input.context);
+      const existing = await repository.get(input.requestId);
+      if (existing && existing.expiresAt <= clock()) throw new Error('PIN request has expired.');
       const record = await repository.transition(input.requestId, [STATES.PENDING], STATES.APPROVED, {
         moderatorId: input.context.actorId,
         updatedAt: clock()

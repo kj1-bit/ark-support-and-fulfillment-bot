@@ -24,6 +24,8 @@ const { createSqlitePanelRepository } = require('../adapters/sqlite/panel-reposi
 const { createArkOperationService } = require('../adapters/rcon/operation-service');
 const { createFulfillmentService } = require('../application/fulfillment-service');
 const { createOnlinePlayerSelectionService } = require('../application/online-player-selection-service');
+const { createSqliteRetentionRepository } = require('../adapters/sqlite/retention-repository');
+const { createRetentionService } = require('../application/retention-service');
 const { createAuditLogger } = require('../logging/audit-logger');
 const { createMigrationRunner } = require('../migrations/migration-runner');
 const migration001 = require('../migrations/001-v2-core');
@@ -252,9 +254,17 @@ async function composeRuntime(options = {}) {
     uuid: randomUUID
   });
 
+  const retention = createRetentionService({
+    repository: createSqliteRetentionRepository(database),
+    policy: config.retention,
+    audit,
+    clock
+  });
+
   return Object.freeze({
     schemaVersion,
     backup,
+    retention,
     authorization,
     interactionGuard,
     players,

@@ -1,6 +1,7 @@
 'use strict';
 const path = require('node:path');
 const { ConfigurationError } = require('./configuration-error');
+const { resolveRetentionPolicy } = require('./retention-policy');
 const MODES = new Set(['mock', 'test', 'production']);
 const LOG_LEVELS = new Set(['debug', 'info', 'warn', 'error']);
 const SNOWFLAKE = /^[1-9][0-9]{16,19}$/;
@@ -8,7 +9,7 @@ const SERVER_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SECRET_REF = /^[A-Z][A-Z0-9_]{2,127}$/;
 const OPERATIONS = new Set(['listOnlinePlayers', 'fulfillApprovedCreature']);
 const FEATURES = ['tickets', 'pins', 'playerNames', 'shop', 'fulfillment', 'dashboards'];
-const TOP_KEYS = new Set(['schemaVersion','runtime','discord','ark','storage','features']);
+const TOP_KEYS = new Set(['schemaVersion','runtime','discord','ark','storage','features','retention']);
 function object(v) { return v && typeof v === 'object' && !Array.isArray(v); }
 function addUnknown(obj, allowed, at, issues) {
   if (!object(obj)) return;
@@ -104,6 +105,11 @@ function validateConfig(input, options={}) {
         issues.push('configuration.features.dashboards: ticketLogs, pinsDashboard, and fulfillmentLogs channels are required');
       }
     }
+  }
+  if ((runtime?.mode==='test'||runtime?.mode==='production')&&features?.pins===true&&!env.PIN_PROTECTION_KEY) issues.push('configuration.features.pins: required PIN_PROTECTION_KEY secret is not present');
+  if (input.retention!==undefined) {
+    try { resolveRetentionPolicy(input.retention); }
+    catch (error) { issues.push(`configuration.retention.${error.message}`); }
   }
   if ((runtime?.mode==='test'||runtime?.mode==='production')&&discord?.tokenSecret&&!env[discord.tokenSecret]) issues.push('configuration.discord.tokenSecret: required secret is not present');
   if (issues.length) throw new ConfigurationError(issues);

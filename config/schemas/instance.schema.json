@@ -12,9 +12,23 @@
     "discord": { "$ref": "#/$defs/discord" },
     "ark": { "$ref": "#/$defs/ark" },
     "storage": { "$ref": "#/$defs/storage" },
-    "features": { "$ref": "#/$defs/features" }
+    "features": { "$ref": "#/$defs/features" },
+    "retention": { "$ref": "#/$defs/retention" }
   },
   "$defs": {
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sessionGraceHours": { "type": "integer", "minimum": 1, "maximum": 720 },
+        "closedTicketDays": { "type": "integer", "minimum": 1, "maximum": 3650 },
+        "completedPinDays": { "type": "integer", "minimum": 1, "maximum": 3650 },
+        "operationalEventDays": { "type": "integer", "minimum": 1, "maximum": 3650 },
+        "fulfillmentIdentityDays": { "type": "integer", "minimum": 1, "maximum": 3650 },
+        "fulfillmentAuditDays": { "type": "integer", "minimum": 1, "maximum": 3650 },
+        "intervalMinutes": { "type": "integer", "minimum": 1, "maximum": 1440 }
+      }
+    },
     "snowflake": {
       "type": "string",
       "pattern": "^[1-9][0-9]{16,19}$"

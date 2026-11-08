@@ -261,7 +261,7 @@ Exit criteria:
 - [x] Back up the database before migration.
 - [x] Validate database integrity before and after migration.
 - [x] Test restoration using a copied database.
-- [ ] Define retention and privacy rules.
+- [x] Define retention and privacy rules (see `docs/V2_RETENTION.md`).
 - [x] Add persistent fulfillment request and operation-result records.
 - [x] Add catalog-version references to fulfillment audit data.
 - [x] Document recovery and rollback procedures.
@@ -412,10 +412,12 @@ A creature catalog update is acceptable only when:
 - Ticket, PIN, and fulfillment audit panels use the same authorized paginated interface and are persisted/restored after restart or message deletion.
 - Enabled features require their staff roles and channels before backup or migrations begin.
 - Slash-command deployment defaults to a reviewed dry run, uses the validated Discord application ID, updates only managed commands, and aborts when the command list changes during review.
+- A scheduled retention service purges expired sessions, old tickets, completed PIN requests, operational events, and old fulfillment audit rows, and anonymizes terminal fulfillment identities. Expired PIN requests no longer block re-requesting, and interrupted fulfillment is reconciled on startup.
+- Enabled PINs require `PIN_PROTECTION_KEY` during configuration validation outside mock mode.
 
 ### Verification
 
-- Full automated suite: 162 tests passed, 0 failed.
+- Full automated suite: 172 tests passed, 0 failed.
 - Public example configuration validation: passed.
 - `git diff --check`: passed.
 - This checkpoint is prepared for the existing PR #17 head branch; it does not merge or deploy the runtime.

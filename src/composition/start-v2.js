@@ -21,6 +21,7 @@ async function startV2(options = {}) {
   let discord;
   try {
     runtime = await compose({ ...options, config, database });
+    await runtime.retention?.recoverInterrupted();
     discord = await options.createDiscordAdapter({
       config,
       env: options.env || process.env,
@@ -45,13 +46,26 @@ async function startV2(options = {}) {
       throw new TypeError('Discord adapter must expose start().');
     }
     await discord.start();
+    if (runtime.retention) {
+      runtime.retention.start();
+      void runtime.retention.runOnce().catch(() => {});
+    }
   } catch (error) {
+    await runtime?.retention?.stop().catch(() => {});
     if (database && typeof database.close === 'function') {
       await database.close().catch(() => {});
     }
     throw error;
   }
-  return Object.freeze({ config, database, runtime, discord });
+  let stopped = false;
+  const stop = async () => {
+    if (stopped) return;
+    stopped = true;
+    await runtime.retention?.stop();
+    if (typeof discord.stop === 'function') await discord.stop();
+    if (typeof database.close === 'function') await database.close();
+  };
+  return Object.freeze({ config, database, runtime, discord, stop });
 }
 
 module.exports = { startV2 };

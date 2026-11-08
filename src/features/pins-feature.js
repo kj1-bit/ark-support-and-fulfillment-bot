@@ -225,9 +225,11 @@ async function eligibleMemberIds(context, interaction, guildId) {
   } catch {
     throw new VaultPinError('MEMBER_FETCH_FAILED', 'Server members could not be loaded. Ensure the bot has the Server Members intent enabled, then try again.');
   }
-  return [...members.values()]
-    .filter(member => !member.user?.bot && member.roles?.cache?.has(memberRoleId))
-    .map(member => member.id);
+  const staffRoleId = context.config?.discord?.roles?.staff;
+  return [...new Set([...members.values()]
+    .filter(member => !member.user?.bot
+      && (member.roles?.cache?.has(memberRoleId) || (staffRoleId && member.roles?.cache?.has(staffRoleId))))
+    .map(member => member.id))];
 }
 
 function createPinsFeature() {
@@ -386,4 +388,4 @@ function createPinsFeature() {
   });
 }
 
-module.exports = { CUSTOM_IDS, VAULT_PANEL_KEY, createPinsFeature, moderationPayload, pinRequestModal, vaultPanelPayload };
+module.exports = { CUSTOM_IDS, VAULT_PANEL_KEY, createPinsFeature, eligibleMemberIds, moderationPayload, pinRequestModal, vaultPanelPayload };

@@ -53,6 +53,29 @@ function createTicketService({ repository, playerNames, authorization, audit, cl
     return repository.setChannelStatus(record.id, record.state === STATES.CLOSED ? 'ARCHIVED' : 'ACTIVE');
   }
 
+  // A persisted transition whose Discord sync failed leaves channel_status behind the ticket state;
+  // repeating the same action re-applies the sync instead of rejecting the already-applied transition.
+  function unsynced(record, closed) {
+    return closed
+      ? record.state === STATES.CLOSED && record.channelStatus === 'ACTIVE'
+      : record.state !== STATES.CLOSED && record.channelStatus === 'ARCHIVED';
+  }
+
+  async function syncAudited(record, phase) {
+    try { return await sync(record); }
+    catch (error) { audit.write('ticket.channel_failed', { id:record.id, phase }); throw error; }
+  }
+
+  async function preflight(record) {
+    if (!['ACTIVE','ARCHIVED'].includes(record?.channelStatus)) return;
+    if (!gateway) throw new Error('Ticket channel service is unavailable.');
+    try { await gateway.verify(record); }
+    catch (error) {
+      audit.write('ticket.channel_failed', { id:record.id, phase:'permissions', missing:error.missing || [] });
+      throw error;
+    }
+  }
+
   return Object.freeze({
     connectChannels(value) { gateway = value; },
     async create(input) {
@@ -128,34 +151,43 @@ function createTicketService({ repository, playerNames, authorization, audit, cl
     },
     close(input) {
       return exclusive(input.ticketId, async () => {
-        if (channelConfig) await checked(input, true);
+        let current = null;
+        if (channelConfig) current = await checked(input, true);
         else authorization.authorize('tickets.moderate', input.context);
+        if (current && unsynced(current, true)) return syncAudited(current, 'archive');
+        await preflight(current);
         const record = await repository.transition(input.ticketId, [STATES.OPEN,STATES.CLAIMED], STATES.CLOSED, {
           moderatorId:input.context.actorId, updatedAt:clock()
         });
         audit.write('ticket.closed', record);
-        try { return await sync(record); }
-        catch (error) { audit.write('ticket.channel_failed', { id:record.id, phase:'archive' }); throw error; }
+        return syncAudited(record, 'archive');
       });
     },
     reopen(input) {
       return exclusive(input.ticketId, async () => {
-        if (channelConfig) await checked(input);
+        let existing = null;
+        if (channelConfig) existing = await checked(input);
         else authorization.authorize('tickets.moderate', input.context);
-        const existing = channelConfig ? await repository.get(input.ticketId) : null;
         if (['DELETED','FAILED'].includes(existing?.channelStatus)) {
           throw new Error('The retained ticket channel is unavailable.');
         }
+        if (existing && unsynced(existing, false)) return syncAudited(existing, 'reopen');
+        await preflight(existing);
         const record = await repository.transition(input.ticketId, [STATES.CLOSED], STATES.OPEN, {
           moderatorId:input.context.actorId, updatedAt:clock()
         });
         audit.write('ticket.reopened', record);
-        return sync(record);
+        return syncAudited(record, 'reopen');
       });
     },
     async recoverChannels() {
       if (!channelConfig || !gateway) return;
       const failures = [];
+      try { await gateway.verify(); }
+      catch (error) {
+        audit.write('ticket.channel_failed', { phase:'permissions', missing:error.missing || [] });
+        failures.push(error);
+      }
       for (const initial of await repository.listChannels()) {
         await exclusive(initial.id, async () => {
           let record = await repository.get(initial.id);

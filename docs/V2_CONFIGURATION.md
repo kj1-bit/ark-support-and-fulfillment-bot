@@ -58,9 +58,9 @@ Runtime composition repeats critical authorization requirements before backup an
 
 ## Discord permissions and standing panels
 
-The enabled features restore V1-style request, Vault, IGN, fulfillment, and inline log panels using persisted message IDs. The bot requires access to send/read/edit panel messages and Manage Channels for private ticket creation, overwrite updates, and retention deletion. The request panel's shop button appears only when `shop` is enabled.
+The enabled features restore V1-style request, Vault, IGN, fulfillment, and inline log panels using persisted message IDs. In panel channels the bot needs View Channel, Send Messages, Read Message History, and Embed Links. For private tickets it needs View Channel, Send Messages, Read Message History, Manage Channels, and Manage Roles (Manage Permissions) in `ticketCategory`, which covers creation, overwrite updates, archive renames, and retention deletion. Manage Messages is not required. Ticket creation and close/reopen check these permissions before acting, and startup audits any that are missing. The request panel's shop button appears only when `shop` is enabled.
 
-Keep `ticketLogs`, `pinsDashboard`, and `fulfillmentLogs` staff-only. Inline dashboard rendering fails with a generic audit notice if ordinary roles can view the channel or permissions cannot be verified; it never silently publishes an ephemeral replacement. Staff interaction authorization remains required for paging.
+Keep `ticketLogs`, `pinsDashboard`, and `fulfillmentLogs` staff-only. Inline dashboard rendering fails with a generic audit notice if ordinary roles can view the channel or permissions cannot be verified; it never silently publishes an ephemeral replacement. Bot integration roles (managed roles tagged with a bot ID, such as this bot's own role) are ignored, so adding the bot's role to a private channel is fine. `@everyone`, booster roles, and every other non-staff role still count as public visibility. Staff interaction authorization remains required for paging.
 
 With `pins` enabled, turn on **Server Members Intent** in the test application's Developer Portal. The launcher requests Guild Members only for that feature so **Generate Missing PINs** can enumerate eligible members. This does not grant PINs to unverified users or reveal them publicly.
 

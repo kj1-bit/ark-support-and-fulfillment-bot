@@ -6,6 +6,7 @@ const { EventEmitter } = require('node:events');
 const { createDashboardsFeature, requireStaffChannel } = require('../../src/features/dashboards-feature');
 const { createOperationalEventService } = require('../../src/domain/dashboards/operational-event-service');
 const { createDashboardService } = require('../../src/domain/dashboards/dashboard-service');
+const { assertUniqueCustomIds } = require('../helpers/custom-ids');
 
 const id = n => `100000000000000${n.toString().padStart(2,'0')}`;
 
@@ -62,6 +63,7 @@ async function setup(t) {
 test('standing dashboards restore, edit in place, and recreate deleted messages with inline logs', async t => {
   const s = await setup(t);
   assert.equal(s.sent.length,3);
+  for (const message of s.sent) assertUniqueCustomIds(message.payload,message.payload.embeds[0].title);
   assert.equal(s.saved.size,3);
   assert.match(s.sent[0].payload.embeds[0].description,/record-1/);
   assert(!JSON.stringify(s.sent).includes('1234'));
@@ -80,7 +82,7 @@ test('authorized paging updates the bound standing message, with refresh and mis
     let body;
     let deferred = false;
     const interaction = {
-      customId:`v2:dashboard:${key}:2`,isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId,
+      customId:`v2:dashboard:${key}:next:2`,isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId,
       channel:s.channels.get(channelId),message:{ id:s.saved.get(key).messageId },member:{ roleIds:[id(2)] },
       deferUpdate:async () => { deferred = true; }, editReply:async payload => { body = payload; },
       reply:async () => assert.fail('Authorized paging should edit inline')
@@ -98,7 +100,7 @@ test('authorized paging updates the bound standing message, with refresh and mis
 test('forged panels and unauthorized staff attempts never update public messages', async t => {
   const s = await setup(t);
   const interaction = {
-    customId:'v2:dashboard:tickets:1',isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId:id(3),
+    customId:'v2:dashboard:tickets:refresh:1',isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId:id(3),
     channel:s.channels.get(id(3)),message:{ id:'forged' },member:{ roleIds:[] },
     deferUpdate:async () => assert.fail('Invalid panel must not be acknowledged as update'),
     reply:async payload => assert.equal(payload.flags,64)
@@ -116,6 +118,24 @@ test('inline dashboard refuses channels visible to ordinary roles', () => {
     guild:{ roles:{ cache:new Map([[id(1),{ id:id(1),permissions:{ has:() => false } }]]) } },
     permissionsFor:() => ({ has:() => true })
   },context),/staff-only/);
+});
+
+test('inline dashboard tolerates bot integration roles but not boosters or ordinary roles', () => {
+  const context = { config:{ discord:{ roles:{ staff:id(2) } } } };
+  const role = (roleId,extra = {}) => ({ id:roleId,permissions:{ has:() => false },...extra });
+  const channel = roles => ({
+    guild:{ roles:{ cache:new Map(roles.map(item => [item.id,item])) } },
+    permissionsFor:item => ({ has:() => item.id !== id(1) })
+  });
+  const everyone = role(id(1));
+  const ownBot = role(id(12),{ managed:true,tags:{ botId:id(13) } });
+  const otherBot = role(id(14),{ managed:true,tags:{ botId:id(15) } });
+  const staff = role(id(2));
+  requireStaffChannel(channel([everyone,staff,ownBot,otherBot]),context);
+  assert.throws(() => requireStaffChannel(channel([everyone,ownBot,
+    role(id(16),{ managed:true,tags:{ premiumSubscriberRole:true } })]),context),/staff-only/);
+  assert.throws(() => requireStaffChannel(channel([everyone,ownBot,role(id(17))]),context),/staff-only/);
+  assert.throws(() => requireStaffChannel(channel([everyone,role(id(18),{ tags:{ botId:id(15) } })]),context),/staff-only/);
 });
 
 test('sanitized persisted events survive service restart without PIN material', async () => {

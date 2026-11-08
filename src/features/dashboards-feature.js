@@ -26,11 +26,11 @@ function pagePayload(panel, page, result, pinsEnabled = false) {
     components:[{
       type:ComponentType.ActionRow,
       components:[
-        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:${Math.max(1,page-1)}`,
+        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:prev:${Math.max(1,page-1)}`,
           label:'Previous', style:ButtonStyle.Secondary, disabled:page <= 1 },
-        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:${page}`,
+        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:refresh:${page}`,
           label:panel.key === 'pins' ? 'Refresh' : 'Refresh Logs', style:ButtonStyle.Primary },
-        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:${Math.min(lastPage,page+1)}`,
+        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:next:${Math.min(lastPage,page+1)}`,
           label:'Next', style:ButtonStyle.Secondary, disabled:page >= lastPage },
         ...(panel.key === 'pins' && pinsEnabled ? [{
           type:ComponentType.Button, custom_id:'v2:pin:generate-missing',
@@ -49,6 +49,8 @@ function requireStaffChannel(channel, context) {
   }
   for (const role of guild.roles.cache.values()) {
     if (role.id === context.config.discord.roles.staff || role.permissions.has(PermissionFlagsBits.Administrator)) continue;
+    // Bot integration roles (this bot or others) are not human audiences; booster and other managed roles still count.
+    if (role.managed && role.tags?.botId) continue;
     if (channel.permissionsFor(role)?.has(PermissionFlagsBits.ViewChannel)) {
       throw new Error('Inline dashboards require staff-only channel permissions.');
     }
@@ -81,8 +83,9 @@ function createDashboardsFeature() {
       listener = registerInteractionListener(context, 'dashboards', async interaction => {
         if (!isButton(interaction)) return;
         const parts = String(interaction.customId || '').split(':');
-        if (parts.length !== 4 || parts[0] !== 'v2' || parts[1] !== 'dashboard') return;
-        const page = Number(parts[3]);
+        if (parts.length !== 5 || parts[0] !== 'v2' || parts[1] !== 'dashboard'
+          || !['prev','refresh','next'].includes(parts[3])) return;
+        const page = Number(parts[4]);
         const definition = panels.find(item => item.key === parts[2]);
         if (!definition || !Number.isSafeInteger(page) || page < 1 || page > 1000) return;
         if (!definition.panel.matches(interaction)) throw new Error('This log panel is no longer valid.');

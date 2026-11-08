@@ -38,7 +38,11 @@ function createTicketsFeature() {
         key:'requests', channelId:context.config.discord.channels.requests,
         payload:requestPayload(context.config.features.shop)
       });
-      context.services.tickets.connectChannels(createTicketChannelGateway({ client:context.client, config:context.config }));
+      context.services.tickets.connectChannels(createTicketChannelGateway({
+        client:context.client, config:context.config,
+        onRenameError:error => context.logSink({ type:'discord.ticket.rename_failed', at:new Date().toISOString(),
+          data:{ code:typeof error?.code === 'number' ? error.code : null } })
+      }));
     },
     async register(context) {
       listener = registerInteractionListener(context, 'tickets', async interaction => {
@@ -78,8 +82,10 @@ function createTicketsFeature() {
       await panel.start(context);
       readyListener = () => {
         if (!pendingRecovery) {
-          pendingRecovery = context.services.tickets.recoverChannels().catch(async () => {
-            await context.logSink({ type:'discord.ticket.restore_failed', at:new Date().toISOString(), data:{} });
+          pendingRecovery = context.services.tickets.recoverChannels().catch(async error => {
+            const missing = [error, ...(error?.errors || [])].find(item => item?.code === 'TICKET_PERMISSIONS_MISSING')?.missing;
+            await context.logSink({ type:'discord.ticket.restore_failed', at:new Date().toISOString(),
+              data:missing ? { missingPermissions:missing } : {} });
           }).finally(() => { pendingRecovery = null; });
         }
         return pendingRecovery;

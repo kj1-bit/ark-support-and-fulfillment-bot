@@ -32,7 +32,8 @@ async function setup(t) {
   const calls = [];
   const gateway = {
     create:async () => (calls.push('create'),id(8)), post:async () => id(9),
-    sync:async record => { calls.push(record.state); }, remove:async () => calls.push('delete'), find:async () => null
+    sync:async record => { calls.push(record.state); }, remove:async () => calls.push('delete'), find:async () => null,
+    verify:async () => {}
   };
   const service = createTicketService({
     repository, playerNames:{ get:async () => ({ status:'VERIFIED',playerName:'Survivor' }) },
@@ -201,26 +202,120 @@ test('failed and interrupted provisioning are recoverable without allocating dup
   assert.equal((await s.repository.get(record.id)).messageId,id(9));
 });
 
-test('gateway creates explicit private overwrites and archives without deleting', async () => {
-  let options;
-  let overwriteRows;
-  let renamed;
-  const record = { id:'TKT-test',actorId:id(6),channelId:id(8),ticketNumber:1,state:'OPEN' };
+function gatewayFixture({ granted = Object.values(PermissionFlagsBits), setName } = {}) {
+  const state = { options:null,overwriteRows:null,renames:[] };
+  const guild = { members:{ me:{ id:id(12) } } };
+  const permissionsFor = member => ({ has:flag => member === guild.members.me && granted.includes(flag) });
   const channel = {
-    id:id(8),guildId:id(1),topic:'Ticketbot V2 request TKT-test',name:'player-1',
-    permissionOverwrites:{ set:async rows => { overwriteRows = rows; } },
-    setName:async name => { renamed = name; }, messages:{ fetch:async () => new Map() }
+    id:id(8),guildId:id(1),guild,permissionsFor,topic:'Ticketbot V2 request TKT-test',name:'player-1',
+    permissionOverwrites:{ set:async rows => { state.overwriteRows = rows; } },
+    setName:setName || (async name => { state.renames.push(name); channel.name = name; return channel; }),
+    messages:{ fetch:async () => new Map() }
   };
   const client = { user:{ id:id(12) }, channels:{ fetch:async () => channel },guilds:{ fetch:async () => ({
-    channels:{ fetch:async () => ({ id:id(5),guildId:id(1),type:ChannelType.GuildCategory }),
-      create:async value => (options = value,channel) }
+    ...guild,
+    channels:{ fetch:async () => ({ id:id(5),guildId:id(1),type:ChannelType.GuildCategory,guild,permissionsFor }),
+      create:async value => (state.options = value,channel) }
   }) } };
   const gateway = createTicketChannelGateway({ client,config:{ discord:config } });
+  return { state,channel,gateway };
+}
+
+test('gateway creates explicit private overwrites and archives without deleting', async () => {
+  const record = { id:'TKT-test',actorId:id(6),channelId:id(8),ticketNumber:1,state:'OPEN' };
+  const { state,gateway } = gatewayFixture();
   assert.equal(await gateway.create(record,'Test User'),id(8));
-  assert.equal(options.name,'testuser-1');
-  assert.deepEqual(options.permissionOverwrites.find(row => row.id === id(1)).deny,[PermissionFlagsBits.ViewChannel]);
-  assert(options.permissionOverwrites.find(row => row.id === id(2)).allow.includes(PermissionFlagsBits.SendMessages));
+  assert.equal(state.options.name,'testuser-1');
+  assert.deepEqual(state.options.permissionOverwrites.find(row => row.id === id(1)).deny,[PermissionFlagsBits.ViewChannel]);
+  assert(state.options.permissionOverwrites.find(row => row.id === id(2)).allow.includes(PermissionFlagsBits.SendMessages));
   await gateway.sync({ ...record,state:'CLOSED' });
-  assert.deepEqual(overwriteRows.find(row => row.id === id(6)).deny,[PermissionFlagsBits.ViewChannel]);
-  assert.equal(renamed,'closed-1-player-1');
+  assert.deepEqual(state.overwriteRows.find(row => row.id === id(6)).deny,[PermissionFlagsBits.ViewChannel]);
+  await gateway.pendingRename(id(8));
+  assert.deepEqual(state.renames,['closed-1-player-1']);
+  await gateway.sync({ ...record,state:'OPEN' });
+  await gateway.pendingRename(id(8));
+  assert.deepEqual(state.renames,['closed-1-player-1','player-1']);
+});
+
+test('ticket channels require Manage Roles and never grant the bot guild-level-only Manage Messages', async () => {
+  const record = { id:'TKT-test',actorId:id(6),channelId:id(8),ticketNumber:1,state:'OPEN' };
+  const full = gatewayFixture();
+  await full.gateway.create(record,'Survivor');
+  const bot = full.state.options.permissionOverwrites.find(row => row.id === id(12));
+  assert(!bot.allow.includes(PermissionFlagsBits.ManageMessages));
+  assert(!bot.allow.includes(PermissionFlagsBits.ManageRoles));
+  const limited = gatewayFixture({ granted:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ReadMessageHistory,PermissionFlagsBits.ManageChannels] });
+  for (const action of [() => limited.gateway.create(record,'Survivor'),() => limited.gateway.verify(),
+    () => limited.gateway.verify(record),() => limited.gateway.sync({ ...record,state:'CLOSED' })]) {
+    await assert.rejects(action,error => error.code === 'TICKET_PERMISSIONS_MISSING'
+      && error.missing.join() === 'Manage Roles' && /Manage Roles/.test(error.message));
+  }
+  assert.equal(limited.state.options,null);
+  assert.equal(limited.state.overwriteRows,null);
+});
+
+test('missing permissions block close and reopen before mutation and are audited at startup', async t => {
+  const s = await setup(t);
+  const record = await s.create();
+  const denied = Object.assign(new Error('missing'),{ code:'TICKET_PERMISSIONS_MISSING',missing:['Manage Roles'] });
+  s.gateway.verify = async () => { throw denied; };
+  await assert.rejects(() => s.service.close({ ticketId:record.id,context:moderator }),/missing/);
+  assert.equal((await s.repository.get(record.id)).state,'OPEN');
+  assert(s.events.some(event => event.type === 'ticket.channel_failed' && event.data.phase === 'permissions'
+    && event.data.id === record.id && event.data.missing[0] === 'Manage Roles'));
+  await assert.rejects(() => s.service.recoverChannels(),AggregateError);
+  assert(s.events.some(event => event.type === 'ticket.channel_failed' && event.data.phase === 'permissions'
+    && event.data.id === undefined));
+  s.gateway.verify = async () => {};
+  await s.service.close({ ticketId:record.id,context:moderator });
+  s.gateway.verify = async () => { throw denied; };
+  await assert.rejects(() => s.service.reopen({ ticketId:record.id,context:moderator }),/missing/);
+  assert.equal((await s.repository.get(record.id)).state,'CLOSED');
+});
+
+test('a failed close or reopen sync remains retryable instead of leaving silent requester access', async t => {
+  const s = await setup(t);
+  const record = await s.create();
+  const sync = s.gateway.sync;
+  s.gateway.sync = async () => { throw Object.assign(new Error('Missing Permissions'),{ code:50013 }); };
+  const requesterClose = { ticketId:record.id,context:{ ...moderator,actorId:requester.actorId,roleIds:[] } };
+  await assert.rejects(() => s.service.close(requesterClose),/Missing Permissions/);
+  let stored = await s.repository.get(record.id);
+  assert.deepEqual([stored.state,stored.channelStatus],['CLOSED','ACTIVE']);
+  assert(s.events.some(event => event.type === 'ticket.channel_failed' && event.data.phase === 'archive'));
+  s.gateway.sync = sync;
+  const archived = await s.service.close(requesterClose);
+  assert.deepEqual([archived.state,archived.channelStatus],['CLOSED','ARCHIVED']);
+  assert.equal(s.events.filter(event => event.type === 'ticket.closed').length,1);
+  s.gateway.sync = async () => { throw new Error('Discord unavailable'); };
+  await assert.rejects(() => s.service.reopen({ ticketId:record.id,context:moderator }),/unavailable/);
+  stored = await s.repository.get(record.id);
+  assert.deepEqual([stored.state,stored.channelStatus],['OPEN','ARCHIVED']);
+  s.gateway.sync = sync;
+  await s.service.recoverChannels();
+  assert.equal((await s.repository.get(record.id)).channelStatus,'ACTIVE');
+  assert.equal(s.events.filter(event => event.type === 'ticket.reopened').length,1);
+});
+
+test('rate-limited renames never hold the ticket lock and settle on the latest state', async () => {
+  const record = { id:'TKT-test',actorId:id(6),channelId:id(8),ticketNumber:1,state:'OPEN',messageId:id(9) };
+  const pending = [];
+  const { state,channel,gateway } = gatewayFixture({ setName:name => new Promise(resolve => {
+    pending.push(() => { state.renames.push(name); channel.name = name; resolve(channel); });
+  }) });
+  channel.messages.fetch = async () => ({ edit:async () => {} });
+  await gateway.sync({ ...record,state:'CLOSED' });
+  assert.deepEqual(state.overwriteRows.find(row => row.id === id(6)).deny,[PermissionFlagsBits.ViewChannel]);
+  await gateway.sync(record);
+  await gateway.sync({ ...record,state:'CLOSED' });
+  assert.equal(pending.length,1);
+  pending.shift()();
+  await gateway.pendingRename(id(8));
+  assert.deepEqual(state.renames,['closed-1-player-1']);
+  await gateway.sync(record);
+  assert.equal(pending.length,1);
+  pending.shift()();
+  await gateway.pendingRename(id(8));
+  assert.equal(channel.name,'player-1');
 });

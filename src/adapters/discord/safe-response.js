@@ -7,6 +7,9 @@ function safeInteractionMessage(error) {
       ? ` <#${error.ticketChannelId}>` : ' creation is in progress.';
     return `You already have an open request:${channel}`;
   }
+  if (error?.code === 'TICKET_PERMISSIONS_MISSING') {
+    return 'Private ticket channels are unavailable because the bot is missing channel permissions. Please contact staff.';
+  }
   if (/PIN must contain exactly four digits/i.test(message)) return 'PIN must contain exactly four digits.';
   if (/player name contains unsupported characters or length/i.test(message)) return 'Player name contains unsupported characters or length.';
   if (/ticket description is invalid/i.test(message)) return 'Ticket description is invalid.';

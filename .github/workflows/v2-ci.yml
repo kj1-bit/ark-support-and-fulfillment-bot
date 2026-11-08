@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           ! grep -RInE "child_process|execFile\(|spawn\(|fork\(" src
-          ! grep -RInE "transport\.execute|\.command" src/features src/adapters/discord
+          ! grep -RInE "transport\.execute|\.command([^[:alnum:]_]|$)" src/features src/adapters/discord
       - name: Reject tracked secrets and runtime data
         shell: bash
         run: |

@@ -77,8 +77,7 @@ function createFulfillmentController({ services, clock = Date.now }) {
       const context = toInteractionContext(interaction, { requireMessage: true });
       return services.fulfillment.confirm({
         context,
-        token: input.token,
-        requestId: input.requestId
+        token: input.token
       });
     },
 

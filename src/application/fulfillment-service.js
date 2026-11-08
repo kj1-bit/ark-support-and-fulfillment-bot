@@ -66,11 +66,14 @@ function createFulfillmentService({
 
     async confirm(input) {
       const decision = authorize(input.context);
-      await interactionGuard.consume(input.token, {
+      const session = await interactionGuard.consume(input.token, {
         ...input.context,
         action: 'fulfillment.confirm'
       });
-      const claimed = await repository.claim(input.requestId, input.context.actorId, clock());
+      if (!session?.requestId) {
+        throw new Error('The confirmation session is missing its request binding.');
+      }
+      const claimed = await repository.claim(session.requestId, input.context.actorId, clock());
       if (claimed.catalogVersion !== creatures.version) {
         throw new Error('Catalog version changed before fulfillment.');
       }

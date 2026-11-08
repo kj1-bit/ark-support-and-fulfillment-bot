@@ -38,7 +38,7 @@ test('empty fulfillment results fail closed without reporting success',async()=>
       authorize:()=>Object.freeze({allowed:true})
     },
     interactionGuard:{
-      consume:()=>Object.freeze({used:true})
+      consume:()=>Object.freeze({used:true,requestId:'FUL-00000000-0000-4000-8000-000000000001'})
     },
     repository,
     creatures:{

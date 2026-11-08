@@ -9,7 +9,7 @@ const { STATES } = require('../../src/domain/fulfillment/state-machine');
 function baseOptions(overrides = {}) {
   return {
     authorization: { authorize: () => ({ allowed: true }) },
-    interactionGuard: { consume: async () => {} },
+    interactionGuard: { consume: async () => ({ requestId: 'FUL-00000000-0000-4000-8000-000000000001' }) },
     repository: createInMemoryFulfillmentRepository(),
     creatures: { version: '1', get: () => ({ id: 'rex' }) },
     ark: { fulfillApprovedCreature: async () => [{ success: true }] },
@@ -29,9 +29,10 @@ const context = {
 test('fulfillment awaits session consumption and player revalidation before execution', async () => {
   const order = [];
   const repository = createInMemoryFulfillmentRepository();
+  const pendingId = 'FUL-00000000-0000-4000-8000-000000000001';
   const service = createFulfillmentService(baseOptions({
     repository,
-    interactionGuard: { consume: async () => order.push('consume') },
+    interactionGuard: { consume: async () => { order.push('consume'); return { requestId: pendingId }; } },
     onlinePlayers: { revalidate: async () => { order.push('revalidate'); return { online: true }; } },
     ark: { fulfillApprovedCreature: async () => { order.push('rcon'); return [{ success: true }]; } }
   }));

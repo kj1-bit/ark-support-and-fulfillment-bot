@@ -63,7 +63,7 @@ test('Discord composition exposes neither database nor raw transport', () => {
   );
 
   const start = source.indexOf('services:Object.freeze({');
-  const end = source.indexOf('})});if(!discord', start);
+  const end = source.indexOf('if (!discord', start);
 
   assert(
     start >= 0 && end > start,

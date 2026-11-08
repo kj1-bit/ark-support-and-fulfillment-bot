@@ -9,6 +9,7 @@ function services() {
     interactionGuard: { issue: async () => ({ token: 't', expiresAt: 1 }) },
     fulfillment: { createPending: async () => ({ id: 'r' }), confirm: async () => ({ id: 'r', state: 'SUCCEEDED' }) },
     players: { byDiscord: () => ({ displayName: 'P', eosId: 'a'.repeat(32) }) },
+    onlinePlayers: {},
     catalogManager: { current: () => ({ version: '1', get: () => ({ id: 'rex', name: 'Rex' }) }) }
   };
 }

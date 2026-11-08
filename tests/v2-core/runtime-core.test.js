@@ -48,6 +48,7 @@ test('empty fulfillment results fail closed without reporting success',async()=>
     ark:{
       fulfillApprovedCreature:async()=>[]
     },
+    onlinePlayers:{revalidate:async()=>({online:true})},
     audit:{
       write:(type,data)=>events.push({type,data})
     },
@@ -59,6 +60,8 @@ test('empty fulfillment results fail closed without reporting success',async()=>
     context,
     creatureId:'rex',
     serverId:'map-one',
+    playerRef:'player-ref-empty-results',
+    playerName:'Target Player',
     eosId:'0123456789abcdef0123456789abcdef',
     idempotencyKey:'empty-results-test',
     ttlMs:1000

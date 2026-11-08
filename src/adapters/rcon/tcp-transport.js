@@ -6,7 +6,7 @@ const EOS_ID = /^[a-f0-9]{32}$/i;
 const MAX_RESPONSE_LENGTH = 65536;
 const FAILED_RESPONSE = /\b(?:error|failed|failure|invalid|not found|not allowed|unknown command)\b/i;
 const MOCK_PLAYER = Object.freeze({
-  characterName: 'Mock Test Player',
+  displayName: 'Mock Test Player',
   eosId: '0123456789abcdef0123456789abcdef'
 });
 
@@ -60,7 +60,7 @@ function createRconTransport({ mode, env = process.env, timeoutMs = 10000, RconC
         timeoutMs
       });
       if (type === OPERATIONS.LIST_PLAYERS) return parseOnlinePlayers(response);
-      return Object.freeze({ success: Boolean(response.trim()) && !FAILED_RESPONSE.test(response) });
+      return Object.freeze({ success: !FAILED_RESPONSE.test(response) });
     }
   });
 }
@@ -104,7 +104,9 @@ function executeCommand({ Rcon, server, password, command, timeoutMs }) {
         }
         finish(null, text);
       });
-      client.once('error', () => finish(new Error(`RCON request failed for server ${server.id}.`)));
+      // Keep a permanent error listener: the library can emit further errors after the request settles.
+      client.on('error', () => finish(new Error(`RCON request failed for server ${server.id}.`)));
+      client.once('end', () => finish(new Error(`RCON connection closed for server ${server.id}.`)));
       client.connect();
     } catch {
       finish(new Error(`RCON request failed for server ${server.id}.`));

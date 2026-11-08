@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, Events, GatewayIntentBits, Partials } = require('discord.js');
 const { backupDatabase } = require('../src/recovery/database-recovery');
 const { openSqliteDatabase } = require('../src/adapters/sqlite/open-database');
 const { createRconTransport } = require('../src/adapters/rcon/tcp-transport');
@@ -20,13 +20,19 @@ function createAuditSink(write = console.info) {
   return event => write(JSON.stringify(event));
 }
 
+function createDefaultDiscordClient() {
+  // Panel self-healing relies on messageDelete, which needs GuildMessages and a partial for uncached messages.
+  return new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+    partials: [Partials.Message]
+  });
+}
+
 function createLauncherOptions(options = {}) {
   const env = options.env || process.env;
   const sourceRoot = path.resolve(options.sourceRoot || SOURCE_ROOT);
   const sqlite3 = options.sqlite3;
-  const createClient = options.createDiscordClient || (() => new Client({
-    intents: [GatewayIntentBits.Guilds]
-  }));
+  const createClient = options.createDiscordClient || createDefaultDiscordClient;
   const write = options.write || (line => console.info(line));
 
   return {
@@ -35,10 +41,15 @@ function createLauncherOptions(options = {}) {
     configPath: options.configPath,
     loadConfig: input => {
       const config = (options.loadConfig || loadConfig)(input);
+      const issues = [];
       if (Object.values(config.features).some(enabled => enabled === true)
         && !env[config.discord.tokenSecret]) {
-        throw new ConfigurationError(['configuration.discord.tokenSecret: required secret is not present when Discord features are enabled']);
+        issues.push('configuration.discord.tokenSecret: required secret is not present when Discord features are enabled');
       }
+      if (config.features.pins === true && !env.PIN_PROTECTION_KEY) {
+        issues.push('configuration.features.pins: required PIN_PROTECTION_KEY secret is not present');
+      }
+      if (issues.length) throw new ConfigurationError(issues);
       return config;
     },
     writeSummary: summary => write(JSON.stringify(summary.type ? summary : { type: 'runtime.config', ...summary })),
@@ -52,10 +63,11 @@ function createLauncherOptions(options = {}) {
         timeoutMs: input.config.ark.timeoutMs,
         RconClass: options.RconClass
       });
-      return composeRuntime({
+      const catalog = loadInitialCatalog(options.catalogPath || path.join(sourceRoot, 'data', 'dino-catalog.json'));
+      const runtime = await composeRuntime({
         ...input,
         randomUUID: options.randomUUID || crypto.randomUUID,
-        catalog: loadInitialCatalog(options.catalogPath || path.join(sourceRoot, 'data', 'dino-catalog.json')),
+        catalog,
         transport,
         buildFulfillmentPlan: ({ creature, eosId }) => buildFulfillmentCommands(creature, eosId),
         auditSink: options.auditSink || createAuditSink(write),
@@ -67,12 +79,17 @@ function createLauncherOptions(options = {}) {
           return backup;
         }
       });
+      // The persisted active catalog wins inside composeRuntime, so a newer shipped catalog must be activated explicitly.
+      if (runtime.catalogManager.current().version !== catalog.version) {
+        await runtime.catalogManager.activate(await runtime.catalogManager.propose(catalog));
+      }
+      return runtime;
     },
     createDiscordAdapter: async ({ config, services }) => {
       const { createDiscordAdapter } = require('../src/adapters/discord/adapter');
       const client = createClient();
       if (typeof client.once === 'function') {
-        client.once('ready', () => write(JSON.stringify({ type: 'runtime.discord.ready' })));
+        client.once(Events.ClientReady, () => write(JSON.stringify({ type: 'runtime.discord.ready' })));
       }
       if (typeof client.on === 'function') {
         client.on('error', () => write(JSON.stringify({ type: 'runtime.discord.error' })));
@@ -127,4 +144,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createAuditSink, createLauncherOptions, run, startV2Service };
+module.exports = { createAuditSink, createDefaultDiscordClient, createLauncherOptions, run, startV2Service };

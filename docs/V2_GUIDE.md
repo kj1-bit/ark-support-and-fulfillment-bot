@@ -49,7 +49,7 @@ Configure only the features you intend to test. Enabled features have required r
 | --- | --- | --- |
 | `playerNames` | `roles.staff`, `channels.playerNames` | Provides verified names used by tickets and PINs. |
 | `tickets` | `roles.staff`, `channels.requests`, `channels.ticketLogs` | Requires `playerNames`. |
-| `pins` | `roles.staff`, `channels.vault`, `channels.pinsDashboard` | Requires `playerNames` and `PIN_PROTECTION_KEY` outside mock mode. |
+| `pins` | `roles.staff`, `channels.vault`, `channels.pinsDashboard` | Requires `playerNames` and `PIN_PROTECTION_KEY` (the launcher requires it in every mode). |
 | `shop` | No feature-specific role/channel fields | Uses the active catalog/search service. |
 | `fulfillment` | `roles.fulfillmentModerator`, `channels.fulfillment`, `channels.fulfillmentLogs` | Requires at least one enabled server and its RCON credential outside mock mode. |
 | `dashboards` | `roles.staff`, `channels.ticketLogs`, `channels.pinsDashboard`, `channels.fulfillmentLogs` | A dashboard renders only events produced by the enabled operational features. |

@@ -51,6 +51,7 @@ function createDatabaseInterface(connection) {
   let closed = false;
   return Object.freeze({
     executeSql(sql) {
+      // sqlite3's run() executes a single statement; migrations must issue one statement per call.
       return new Promise((resolve, reject) => {
         connection.run(sql, error => error ? reject(error) : resolve());
       });

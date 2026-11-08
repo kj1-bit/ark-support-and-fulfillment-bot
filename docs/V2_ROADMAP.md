@@ -419,7 +419,7 @@ A creature catalog update is acceptable only when:
 
 ### Verification
 
-- Full automated suite after Debian launcher work: 178 tests passed, 0 failed.
+- Full automated suite after Debian launcher review fixes: 184 tests passed, 0 failed.
 - Creature catalog validation and reviewed catalog coverage: passed.
 - Public example configuration validation: passed.
 - `git diff --check`: passed.

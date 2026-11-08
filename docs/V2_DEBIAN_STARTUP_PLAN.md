@@ -19,7 +19,7 @@ Paths below are relative to the repository root unless identified as planned Deb
 | V2 executable | `scripts/start-v2.js` (`npm run start:v2`) | Reads `TICKETBOT_CONFIG_PATH` or the default ignored local config, starts V2, and handles SIGINT/SIGTERM. |
 | V2 startup coordinator | `src/composition/start-v2.js` | Injected startup lifecycle used by the executable and tests. |
 | V2 runtime wiring | `scripts/start-v2.js`, `src/composition/compose-runtime.js` | Supplies SQLite, catalog, Discord, RCON, fulfillment plan, backup, and audit dependencies. |
-| V2 catalog loader | `src/composition/load-initial-catalog.js` | Loads enabled/tameable entries from `data/dino-catalog.json` and derives a deterministic content-fingerprint version. |
+| V2 catalog loader | `src/composition/load-initial-catalog.js` | Loads enabled/tameable entries from `data/dino-catalog.json` and derives a deterministic content-fingerprint version. On each start the launcher activates (audited, atomic) any shipped catalog whose version differs from the persisted active catalog, so updated releases take effect. |
 | SQLite opener | `src/adapters/sqlite/open-database.js` | Creates the configured parent directory, uses foreign keys and DELETE journaling, and restricts database-file permissions. |
 | RCON transport | `src/adapters/rcon/tcp-transport.js` | Uses named allowlisted operations, secret references, bounded responses, timeouts, and sanitized failures; mock mode performs no RCON connection. |
 | V2 Discord feature adapter | `src/adapters/discord/adapter.js` | Receives a `discord.js` client and composed feature services from the launcher. |
@@ -59,7 +59,7 @@ These are proposed paths, not paths created by this repository. Before adopting 
 2. Install from the committed lockfile with the approved install scripts, using the supported Node/npm versions. Build or native-module verification steps must be explicit in the release instructions if required.
 3. Place the private JSON configuration at `/etc/ticketbot-v2/instance.json` and secrets in the approved environment file/provider. Keep credentials out of command history and process arguments. Set `TICKETBOT_CONFIG_PATH=/etc/ticketbot-v2/instance.json`.
 4. Set `runtime.mode` to `test`. Point `discord` at the test application/guild, `ark.servers` only at the test ARK server, and `storage` only at the V2 test directories.
-5. Ensure `DISCORD_TOKEN` exists whenever any Discord feature is enabled, including in mock mode. In `test` mode also provide configured test RCON secrets and (when PINs are enabled) `PIN_PROTECTION_KEY`. The PIN key is base64 for exactly 32 bytes and must be retained securely for the lifetime of encrypted pending PINs.
+5. Ensure `DISCORD_TOKEN` exists whenever any Discord feature is enabled, and `PIN_PROTECTION_KEY` exists whenever PINs are enabled, including in mock mode (the launcher checks both before opening SQLite). In `test` mode also provide configured test RCON secrets. The PIN key is base64 for exactly 32 bytes and must be retained securely for the lifetime of encrypted pending PINs.
 6. Validate the private file and run the complete checks from the staged release:
 
    ```sh
@@ -100,7 +100,7 @@ These are proposed paths, not paths created by this repository. Before adopting 
    WantedBy=multi-user.target
    ```
 
-   Verify `/usr/bin/node` with `command -v node`; do not copy this example into production without separate review. The launcher emits a safe config summary and a `runtime.discord.ready` journal event. RCON command responses are normalized; raw responses and commands are not logged or persisted. A non-empty RCON response without recognized failure text indicates transport-level acceptance, not independent proof that the creature appeared in-game.
+   Verify `/usr/bin/node` with `command -v node`; do not copy this example into production without separate review. The launcher emits a safe config summary and a `runtime.discord.ready` journal event. RCON command responses are normalized; raw responses and commands are not logged or persisted. A RCON reply without recognized failure text (including an empty reply, which AAT commands commonly return) is treated as accepted, matching V1; this is transport-level acceptance, not independent proof that the creature appeared in-game. A closed connection, timeout, or error reply fails the operation. The launcher's Discord client requests the `Guilds` and `GuildMessages` intents plus the message partial so dashboard panels are recreated after deletion; these are not privileged intents.
 8. Verify the unit, then start it only for the isolated test:
 
    ```sh

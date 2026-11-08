@@ -31,7 +31,7 @@ test('tickets start after required player-name feature and panel listeners are c
   assert.deepEqual(adapter.featureNames,['player-names','tickets']);
   await adapter.start();
   assert(loggedIn);
-  assert.equal(client.listenerCount('interactionCreate'),2);
+  assert.equal(client.listenerCount('interactionCreate'),3);
   assert(client.listenerCount('ready') >= 2);
   await adapter.stop();
   assert.equal(client.eventNames().length,0);

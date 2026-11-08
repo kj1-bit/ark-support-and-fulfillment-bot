@@ -178,6 +178,20 @@ test('bad ticket channels retain their records while unrelated channel and recor
   assert.equal(await retention.purgeClosedTickets(200),0);
 });
 
+test('a legacy record-only open ticket does not block a new private request', async t => {
+  const s = await setup(t);
+  await s.db.run(
+    `INSERT INTO tickets
+     (id,type,description,actor_id,player_name,guild_id,channel_id,state,created_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    ['legacy-open','SUPPORT','Created by the retired /ticket command',requester.actorId,'Survivor',id(1),id(3),'OPEN',1,1]
+  );
+  assert.equal(await s.repository.findActive(id(1),requester.actorId),null);
+  const record = await s.create();
+  assert.equal(record.channelStatus,'ACTIVE');
+  assert.equal((await s.repository.findActive(id(1),requester.actorId)).id,record.id);
+});
+
 test('reopening cannot bypass a newer active private request', async t => {
   const s = await setup(t);
   const first = await s.create();

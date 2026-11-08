@@ -5,7 +5,7 @@ const {
 } = require('discord.js');
 const { defineFeature } = require('./feature-contract');
 const { toInteractionContext } = require('../adapters/discord/interaction-context');
-const { ephemeral, isButton, isChatInput, isModal, respond, safePublicRecord } = require('../adapters/discord/interaction-protocol');
+const { ephemeral, isButton, isModal, respond, safePublicRecord } = require('../adapters/discord/interaction-protocol');
 const { registerInteractionListener } = require('../adapters/discord/interaction-listener');
 const { createPersistentPanel } = require('../adapters/discord/persistent-panel');
 const { VaultPinError } = require('../domain/pins/vault-pin-service');
@@ -324,14 +324,7 @@ function createPinsFeature() {
 
         let action;
         let input;
-        if (isChatInput(interaction) && interaction.commandName === 'pin') {
-          action = interaction.options.getSubcommand();
-          if (action === 'request') return interaction.showModal(pinRequestModal());
-          input = {
-            requestId: interaction.options.getString('request-id', true),
-            context: toInteractionContext(interaction)
-          };
-        } else if (isButton(interaction) && String(interaction.customId).startsWith('v2:pin:')) {
+        if (isButton(interaction) && String(interaction.customId).startsWith('v2:pin:')) {
           const parts = interaction.customId.split(':');
           if (parts.length !== 4 || !REQUEST_ID.test(parts[3])) return;
           action = parts[2];

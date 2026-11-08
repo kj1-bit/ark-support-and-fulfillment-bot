@@ -28,7 +28,7 @@ test('Discord adapter registers fulfillment through the feature manager', async 
   assert.deepEqual(adapter.featureNames, ['fulfillment']);
   await adapter.start();
   await adapter.stop();
-  assert.deepEqual(calls.map(x => x[0]), ['on', 'on', 'on', 'login', 'off', 'off', 'off', 'destroy']);
+  assert.deepEqual(calls.map(x => x[0]), ['on', 'on', 'on', 'on', 'login', 'off', 'off', 'off', 'off', 'destroy']);
 });
 
 test('disabled features cause no listener, login, or destroy activity', async () => {
@@ -51,7 +51,7 @@ test('login failure cleans up registered listeners and destroys the Discord clie
   };
   const adapter=createDiscordAdapter({client,config:{features:{fulfillment:true},discord:{tokenSecret:'DISCORD_TOKEN',channels:{fulfillment:'10000000000000003'}}},env:{DISCORD_TOKEN:'secret'},services:services()});
   await assert.rejects(()=>adapter.start(),/login failed/);
-  assert.deepEqual(calls.map(x=>x[0]),['on','on','on','off','off','off','destroy']);
+  assert.deepEqual(calls.map(x=>x[0]),['on','on','on','on','off','off','off','off','destroy']);
 });
 
 test('adapter stop is idempotent before start and after shutdown', async () => {

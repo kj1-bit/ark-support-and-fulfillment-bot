@@ -20,7 +20,7 @@ V2 separates Discord presentation from application rules and persistence:
 
 1. **Configuration** is read as JSON, validated (including feature-specific settings and secret presence), then deeply frozen. Invalid configuration stops before the database opens.
 2. **Runtime composition** checks database integrity, makes a backup, applies ordered SQLite migrations, and constructs narrow application services.
-3. **Feature handlers** translate real Discord slash-command, button, and modal interactions into validated service calls. Authorization is checked at the service boundary, not just by hiding a command.
+3. **Feature handlers** translate real Discord button, select-menu, and modal interactions into validated service calls. Authorization is checked at the service boundary, not just by hiding a button.
 4. **Repositories** persist tickets, trusted player associations, PIN requests, fulfillment requests, interaction sessions, catalog versions, log events, and dashboard message IDs.
 5. **Adapters** contain Discord and SQLite boundaries and an allowlisted RCON operation service. `scripts/start-v2.js` supplies the concrete runtime wiring; the [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) describes isolated staging and remaining operational validation.
 
@@ -30,14 +30,14 @@ The current SQLite schema version is **13**. Migrations are ordered and transact
 
 | Feature | What users/staff do | Important behavior |
 | --- | --- | --- |
-| Player names | **Set My In-Game Name** opens the name modal; staff verification and online identity linking are also reachable from buttons. Existing slash commands remain. | Player names must be verified before tickets or Vault PINs; verification is never automatic. Fulfillment additionally requires a trusted online identity association. |
-| Tickets | **Open Request** creates a numbered private channel under `ticketCategory`. **Ticket Completed** marks completion; **Close Ticket** archives; staff can reopen or claim using the existing commands. | One active request per guild/user, including claimed/completed requests. Completion does not close the channel. Requester or staff may close; completion/reopening are staff-only. |
-| PINs | **Get My Vault PIN** generates a four-digit PIN once, or retrieves the existing PIN, and sends it only by DM. Staff can **Generate Missing PINs**. The chosen-PIN request/approval/private-delivery flow remains available. | Generated PINs are encrypted and retained for retrieval. Existing one-time approved requests still clear their encrypted material after delivery. No PIN is shown in interaction replies or logs. |
-| Shop search | **Search In-Game Shop** opens a paged catalog-search modal. `/shop-search` remains available. | Search results are informational; DLC warnings are shown when present. This searches V2's catalog, not a live F1 shop integration. |
+| Player names | **Set My In-Game Name** opens the name modal; staff use **Verify Player Name** and **Link Online Player** on the same panel. | Player names must be verified before tickets or Vault PINs; verification is never automatic. Fulfillment additionally requires a trusted online identity association. |
+| Tickets | **Open Request** creates a numbered private channel under `ticketCategory`. In the channel, staff can **Claim Ticket** while it is open and press **Ticket Completed**; **Close Ticket** archives; staff can **Reopen Ticket**. | One active request per guild/user, including claimed/completed requests. Completion does not close the channel. Requester or staff may close; claiming, completion and reopening are staff-only. |
+| PINs | **Get My Vault PIN** generates a four-digit PIN once, or retrieves the existing PIN, and sends it only by DM. Staff can **Generate Missing PINs**. **Request a Custom PIN** keeps the chosen-PIN request with staff Approve / Deliver by DM / Cancel buttons. | Generated PINs are encrypted and retained for retrieval. Existing one-time approved requests still clear their encrypted material after delivery. No PIN is shown in interaction replies or logs. |
+| Shop search | **Search In-Game Shop** opens a paged catalog-search modal. | Search results are informational; DLC warnings are shown when present. This searches V2's catalog, not a live F1 shop integration. |
 | Player linking and fulfillment | **Browse Dino Catalog** / **Search Dino** guide authorized moderators through creature, enabled map, trusted online player, review, and **Confirm Spawn** / Cancel. | Confirmation uses a bound, single-use interaction token. The active catalog version is checked before execution. Fulfillment is restricted to configured allowlisted operations. |
 | Dashboards | Staff use Previous / Refresh / Next directly in the standing ticket, PIN, and fulfillment panels. | Inline logs require staff-only channels; unauthorized paging is rejected. Panel IDs are restored after startup and recreated after deletion, without removing event history. |
 
-These are V2 interaction contracts. They are not a claim that the current root V1 process handles the V2 commands.
+These are V2 interaction contracts. They are not a claim that the current root V1 process handles them. V2 registers no slash commands: every flow starts from a standing panel button. If a Discord client still shows a retired V2 command, invoking it returns a private "This command has been replaced by the server panels" reply and does nothing else.
 
 ## Discord setup planning
 
@@ -80,7 +80,7 @@ Copy-Item config/examples/instance.example.json config/runtime/instance.local.js
 
 Use the corresponding shell commands on Linux. Replace the example guild, application, role, channel, server, and storage values. Use local environment variables or the approved host secret manager for secret values. Configuration contains **secret references**, not secret values:
 
-- `discord.tokenSecret` names the environment variable containing the bot token. The deployment script reads `DISCORD_TOKEN`.
+- `discord.tokenSecret` names the environment variable containing the bot token. The one-time command cleanup script reads `DISCORD_TOKEN`.
 - Each `ark.servers[].passwordSecret` names the environment variable containing that server's RCON password.
 - `PIN_PROTECTION_KEY` is a separate secret, not stored in the JSON file. When PINs are enabled in test or production mode, it must be base64-encoded key material that decodes to exactly 32 bytes. Generate it with an approved cryptographic tool; do not reuse the Discord or RCON password.
 
@@ -100,18 +100,18 @@ npm.cmd run config:validate -- config/runtime/instance.local.json
 
 The validator prints a safe summary (including secret-presence booleans), not secret values or storage paths. Invalid feature configuration, missing required secrets, unknown properties, or unsafe production settings fail validation.
 
-## Discord command registration is a separate action
+## Retiring the old slash commands
 
-The deployment script is not a V2 launcher. It changes the application's **global** application-command registration only:
+V2 no longer registers or handles slash commands. Earlier V2 test releases registered seven global commands: `/ticket`, `/pin`, `/player-name`, `/player-name-verify`, `/player-link`, `/dino-fulfillment`, and `/shop-search`. The panels replace all of them. `scripts/deploy-v2-commands.js` is kept only as a **one-time cleanup** that removes those seven from an application that still has them. It registers nothing new:
 
 ```powershell
 node scripts/deploy-v2-commands.js
 node scripts/deploy-v2-commands.js --apply
 ```
 
-The first command performs a **dry run** and prints the proposed manifest diff. Review it before considering `--apply`. The script uses the validated `discord.clientId`, requires `DISCORD_TOKEN`, and modifies only commands managed by this script; unrelated commands are preserved. Disabled features cause their managed commands to be removed from the desired global manifest. It re-reads commands before applying and aborts if the list changed, but Discord has no atomic compare-and-swap; serialize command deployments. Global registration may affect where commands appear across servers using that application.
+The first command is a **dry run**. It should list exactly the retired commands still present under `remove` and any other application commands under `preserve`. Review it before considering `--apply`, which deletes only those retired commands. The script uses the validated `discord.clientId` and requires `DISCORD_TOKEN`. Unrelated commands are always preserved. It re-reads commands before applying and aborts if the list changed, but Discord has no atomic compare-and-swap, so do not run it concurrently. Once the retired commands are gone, further runs report no changes. Applications that never had V2 commands need no cleanup.
 
-Do not run `--apply` against a live application as part of setup or source merge. Use a disposable test application only after an operator has reviewed the exact diff and confirmed the target application. This script uses global command routes; it does not target a single test guild.
+Do not run the script, including the dry run, against a live application as part of setup or source merge. Use it on a disposable test application only after an operator has confirmed the target application. It uses global command routes, so it does not target a single test guild.
 
 ## Persistence, privacy, and recovery
 
@@ -140,7 +140,7 @@ Before calling V2 test-ready, complete all of the following in a disposable envi
 1. Validate the private JSON config and confirm invalid configuration fails before opening SQLite. For mock mode with any feature enabled, provide the configured Discord token secret.
 2. Run the full automated suite and catalog validation against the exact release commit.
 3. Start with mock or test endpoints using `npm run start:v2`; confirm feature registration matches enabled flags, the Discord ready log appears, and disabled features make no external connections.
-4. Exercise panel-driven name submission/staff verification/linking, private ticket creation/duplicate protection/completion/archival/reopening, generated PIN retrieval/failed-DM retry, retained PIN approval/private delivery, shop pagination, and inline dashboard authorization/privacy checks.
+4. Exercise panel-driven name submission/staff verification/linking, private ticket creation/duplicate protection/claim/completion/archival/reopening, generated PIN retrieval/failed-DM retry, retained PIN approval/private delivery, shop pagination, and inline dashboard authorization/privacy checks. On an application that previously had V2 commands, run the command cleanup dry run, then `--apply`, and confirm a stale retired command only returns the private panel pointer.
 5. Verify fulfillment against the ARK test server, including cancellation, catalog version change, pair-delivery partial result, restart recovery, and explicit handling of `UNCERTAIN`.
 6. Observe retention cleanup in the test database and confirm only records past the configured policy are affected.
 7. Test a process restart and panel recreation after deleting a test panel message.

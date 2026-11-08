@@ -36,7 +36,7 @@ The V2 validator never infers a mode from V1's `ARK_RCON_MOCK` flag. Always set 
 
 ## Secret references
 
-`discord.tokenSecret` and `ark.servers[].passwordSecret` are environment-variable names. Runtime adapters resolve their values at the boundary. The command registration script specifically requires `DISCORD_TOKEN` and uses `discord.clientId` as the application ID.
+`discord.tokenSecret` and `ark.servers[].passwordSecret` are environment-variable names. Runtime adapters resolve their values at the boundary. The one-time command cleanup script specifically requires `DISCORD_TOKEN` and uses `discord.clientId` as the application ID.
 
 When `features.pins` is enabled in `test` or `production`, the host must also provide `PIN_PROTECTION_KEY`: base64-encoded key material decoding to exactly 32 bytes. The launcher requires a valid key in mock mode as well whenever PINs are enabled, and rejects a malformed key before SQLite is opened. Keep it separate from the JSON configuration and all other credentials. Loss of this key prevents decryption of pending PIN requests and persistent generated Vault PINs. Generated PINs remain encrypted for repeated private DM retrieval; do not replace this key without an operator-reviewed re-encryption procedure.
 

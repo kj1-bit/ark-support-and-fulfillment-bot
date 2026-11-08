@@ -17,6 +17,8 @@ module.exports = Object.freeze({
        UPDATE ticket_counter SET value=value+1 WHERE id=1;
        UPDATE tickets SET ticket_number=(SELECT value FROM ticket_counter WHERE id=1) WHERE id=NEW.id;
      END`,
+    // Superseded by idx_ticket_requester_active; legacy record-only tickets must not block private requests.
+    'DROP INDEX IF EXISTS idx_tickets_open_unique',
     `CREATE UNIQUE INDEX idx_ticket_requester_active ON tickets(guild_id,actor_id)
      WHERE channel_status IS NOT NULL AND state IN ('OPEN','CLAIMED')`,
     'CREATE UNIQUE INDEX idx_ticket_channel ON tickets(channel_id) WHERE channel_status IN (\'ACTIVE\',\'ARCHIVED\')'

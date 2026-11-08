@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 const { safeInteractionMessage } = require('./safe-response');
-const { ephemeral, isButton, isChatInput, isStringSelect, isModal } = require('./interaction-protocol');
+const { ephemeral, isButton, isStringSelect, isModal } = require('./interaction-protocol');
 
 const FLOW_TTL_MS = 120000;
 const MAX_FLOWS = 500;
@@ -96,16 +96,6 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
     return render(interaction, { ...data, stage: 'server', serverPage: page, serverTotal: servers.length,
       serverIds: servers.slice((page - 1) * 25, page * 25).map(server => server.id) },
     id => views.serverSelectionView(servers, id, data.linking, page));
-  }
-  async function beginFulfillment(interaction) {
-    await interaction.deferReply({ flags: 64 });
-    return showPlayers(interaction, { serverId: interaction.options.getString('server', true),
-      creatureId: interaction.options.getString('creature', true) });
-  }
-  async function beginPlayerLink(interaction) {
-    await interaction.deferReply({ flags: 64 });
-    return showPlayers(interaction, { serverId: interaction.options.getString('server', true),
-      discordId: interaction.options.getUser('user', true).id, linking: true });
   }
   async function beginPanel(interaction) {
     if (handleFulfillment && ['v2:fulfillment:browse', 'v2:fulfillment:search'].includes(interaction.customId)) {
@@ -226,12 +216,6 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
     async handle(interaction) {
       cleanFlows();
       try {
-        if (handleFulfillment && isChatInput(interaction) && interaction.commandName === 'dino-fulfillment') {
-          return await beginFulfillment(interaction);
-        }
-        if (handlePlayerLink && isChatInput(interaction) && interaction.commandName === 'player-link') {
-          return await beginPlayerLink(interaction);
-        }
         if (isButton(interaction) && ['v2:fulfillment:browse', 'v2:fulfillment:search',
           'v2:player-name:verify', 'v2:player-name:link'].includes(interaction.customId)) return await beginPanel(interaction);
         const parsed = parseCustomId(interaction.customId);

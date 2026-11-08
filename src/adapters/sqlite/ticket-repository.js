@@ -22,7 +22,7 @@ function createSqliteTicketRepository(database) {
     get: find,
     async findActive(guildId, actorId) {
       return publicTicket(await database.get(
-        "SELECT * FROM tickets WHERE guild_id=? AND actor_id=? AND state IN ('OPEN','CLAIMED') ORDER BY created_at LIMIT 1",
+        "SELECT * FROM tickets WHERE guild_id=? AND actor_id=? AND channel_status IS NOT NULL AND state IN ('OPEN','CLAIMED') ORDER BY created_at LIMIT 1",
         [guildId, actorId]
       ));
     },
@@ -34,7 +34,8 @@ function createSqliteTicketRepository(database) {
             `INSERT INTO tickets
              (id,type,description,actor_id,player_name,guild_id,channel_id,state,created_at,updated_at,source_channel_id,channel_status)
              SELECT ?,?,?,?,?,?,?,?,?,?,?,?
-             WHERE NOT EXISTS (SELECT 1 FROM tickets WHERE guild_id=? AND actor_id=? AND state IN ('OPEN','CLAIMED'))`,
+             WHERE NOT EXISTS (SELECT 1 FROM tickets WHERE guild_id=? AND actor_id=?
+               AND channel_status IS NOT NULL AND state IN ('OPEN','CLAIMED'))`,
             [r.id,r.type,r.description,r.actorId,r.playerName,r.guildId,r.channelId,r.state,r.createdAt,r.updatedAt,
               r.channelId,r.channelStatus,r.guildId,r.actorId]
           );
@@ -106,7 +107,7 @@ function createSqliteTicketRepository(database) {
          WHERE id=? AND state IN (${placeholders})
          ${toState === 'OPEN' ? `AND (channel_status IS NULL OR NOT EXISTS (
            SELECT 1 FROM tickets AS other WHERE other.guild_id=tickets.guild_id AND other.actor_id=tickets.actor_id
-           AND other.id<>tickets.id AND other.state IN ('OPEN','CLAIMED'))) ` : ''}`,
+           AND other.id<>tickets.id AND other.channel_status IS NOT NULL AND other.state IN ('OPEN','CLAIMED'))) ` : ''}`,
         [toState,meta.moderatorId,meta.updatedAt,id,...states]
       );
       if (result.changes !== 1) throw new Error('Ticket state changed concurrently or transition is invalid.');

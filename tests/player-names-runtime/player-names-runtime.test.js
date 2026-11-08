@@ -21,7 +21,7 @@ test('player-name feature is enabled through camel-case configuration mapping', 
   assert.deepEqual(adapter.featureNames, ['player-names']);
   await adapter.start();
   await adapter.stop();
-  assert.deepEqual(calls.map(x => x[0]), ['on', 'on', 'on', 'login', 'off', 'off', 'off', 'destroy']);
+  assert.deepEqual(calls.map(x => x[0]), ['on', 'on', 'on', 'on', 'login', 'off', 'off', 'off', 'off', 'destroy']);
 });
 test('disabled player names register no feature', () => {
   const client = { on() {}, login: async () => {}, destroy: async () => {} };

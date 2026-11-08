@@ -3,7 +3,7 @@
 const crypto = require('node:crypto');
 const { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { defineFeature } = require('./feature-contract');
-const { isChatInput, isButton, isModal, respond, ephemeral } = require('../adapters/discord/interaction-protocol');
+const { isButton, isModal } = require('../adapters/discord/interaction-protocol');
 const { registerInteractionListener } = require('../adapters/discord/interaction-listener');
 const { createPersistentPanel } = require('../adapters/discord/persistent-panel');
 
@@ -35,12 +35,11 @@ function createShopFeature() {
     }
     return flow;
   }
-  async function search(context, interaction, query, page, paged) {
+  async function search(context, interaction, query, page) {
     const result = await context.services.shop.search({ query, page });
     const items = Array.isArray(result?.results) ? result.results : Array.isArray(result) ? result : [];
     const content = items.length ? items.slice(0, 10).map(item =>
       `${item.name}${item.dlc?.warning ? ` - ${item.dlc.warning}` : ''}`).join('\n') : 'No matching creatures found.';
-    if (!paged) return respond(interaction, ephemeral(content));
     const id = store(interaction, { query, page: result.page || page, kind: 'results' });
     const flow = flows.get(id);
     const button = (action, label, disabled = false) => ({ type: 2, custom_id: `v2:shop:${action}:${id}`, label, style: 2, disabled });
@@ -72,11 +71,6 @@ function createShopFeature() {
     },
     async register(context) {
       listener = registerInteractionListener(context, 'shop', async interaction => {
-        if (isChatInput(interaction) && interaction.commandName === 'shop-search') {
-          await interaction.deferReply({ flags: 64 });
-          return search(context, interaction, interaction.options.getString('query', true),
-            interaction.options.getInteger('page', false) || 1, false);
-        }
         if (isButton(interaction) && interaction.customId === 'v2:shop:search') {
           if (panel && !panel.matches(interaction)) return false;
           const saved = await context.services.dashboardPanels?.get('requests');
@@ -95,7 +89,7 @@ function createShopFeature() {
           if (flow.kind !== 'modal') return false;
           flows.delete(id);
           await interaction.deferReply({ flags: 64 });
-          return search(context, interaction, interaction.fields.getTextInputValue('query'), 1, true);
+          return search(context, interaction, interaction.fields.getTextInputValue('query'), 1);
         }
         if (!isButton(interaction) || action === 'query') return false;
         const flow = resolve(interaction, id);
@@ -108,7 +102,7 @@ function createShopFeature() {
         await interaction.deferUpdate();
         if (action === 'cancel') return interaction.editReply({ content: 'Shop search canceled.', components: [] });
         return search(context, interaction, flow.query,
-          action === 'next' ? flow.page + 1 : Math.max(1, flow.page - 1), true);
+          action === 'next' ? flow.page + 1 : Math.max(1, flow.page - 1));
       });
     },
     async start(context) { if (panel) await panel.start(context); },

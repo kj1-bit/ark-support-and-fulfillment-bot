@@ -1,8 +1,10 @@
-'use strict';
+﻿'use strict';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { deploy } = require('../../scripts/deploy-v2-commands');
+const {
+  RETIRED_COMMAND_NAMES, commandDiff, commands, commandsForFeatures, deploy, mergeCommands
+} = require('../../scripts/deploy-v2-commands');
 
 function fakeRest(initial, afterRead) {
   const calls = [];
@@ -23,48 +25,64 @@ function fakeRest(initial, afterRead) {
 
 const config = {
   discord: { clientId: 'configured-client-id' },
-  features: { tickets: false, pins: true, playerNames: false, shop: false, fulfillment: false }
+  features: { tickets: true, pins: true, playerNames: true, shop: true, fulfillment: true }
 };
 
-test('command deployment defaults to a reviewed dry run and uses the validated application ID', async () => {
-  const { calls, rest } = fakeRest([{ id: 'legacy-id', name: 'legacy', description: 'Unmanaged' }]);
+const retiredNames = ['dino-fulfillment', 'player-link', 'player-name', 'player-name-verify', 'ticket', 'pin', 'shop-search'];
+const registered = [
+  ...retiredNames.map((name, index) => ({ id: `retired-${index}`, application_id: 'configured-client-id', name, description: 'Old V2 command' })),
+  { id: 'unrelated-id', application_id: 'configured-client-id', name: 'legacy', description: 'Unmanaged' }
+];
+
+test('every slash command the panels replaced is retired and none are registered', () => {
+  assert.deepEqual([...RETIRED_COMMAND_NAMES].sort(), [...retiredNames].sort());
+  assert(Object.isFrozen(RETIRED_COMMAND_NAMES));
+  assert.deepEqual(commands, []);
+  assert.deepEqual(commandsForFeatures(config.features), []);
+  assert.deepEqual(mergeCommands(registered, config.features).map(command => command.name), ['legacy']);
+  const diff = commandDiff(registered, []);
+  assert.deepEqual([...diff.remove].sort(), [...retiredNames].sort());
+  assert.equal(diff.preserve, 1);
+});
+
+test('command cleanup dry run reports the retired commands for removal and preserves unrelated commands', async () => {
+  const { calls, rest } = fakeRest(registered);
   const result = await deploy({
     env: { DISCORD_TOKEN: 'token', CLIENT_ID: 'wrong-client-id' },
     rest,
     config
   });
   assert.equal(result.applied, false);
-  assert.deepEqual(result.diff.add.map(command => command.name), ['pin']);
-  assert.deepEqual(result.diff.remove, []);
+  assert.deepEqual([...result.diff.remove].sort(), [...retiredNames].sort());
+  assert.deepEqual(result.diff.add, []);
   assert.deepEqual(result.diff.update, []);
   assert.equal(result.diff.preserve, 1);
-  assert.deepEqual(result.diff.add[0].options.map(option => option.name), ['request', 'approve', 'deliver', 'cancel']);
   assert(calls.every(call => call[0] !== 'post' && call[0] !== 'patch' && call[0] !== 'delete'));
   assert(calls.filter(call => call[0] === 'get').every(call => call[1].includes('configured-client-id')));
 });
 
-test('command deployment aborts if the application command list changes during review', async () => {
-  const initial = [{ id: 'legacy-id', name: 'legacy', description: 'Unmanaged' }];
-  const { calls, rest } = fakeRest(initial, current => [...current, { id: 'new-id', name: 'other', description: 'Concurrent' }]);
-  await assert.rejects(() => deploy({
-    env: { DISCORD_TOKEN: 'token' },
-    rest,
-    config,
-    apply: true
-  }), /changed during review/);
-  assert(calls.every(call => call[0] !== 'post' && call[0] !== 'patch' && call[0] !== 'delete'));
+test('command cleanup apply deletes exactly the retired commands and leaves unrelated commands', async () => {
+  const { calls, rest } = fakeRest(registered);
+  const result = await deploy({ env: { DISCORD_TOKEN: 'token' }, rest, config, apply: true });
+  assert.equal(result.applied, true);
+  const writes = calls.filter(call => ['post', 'patch', 'delete'].includes(call[0]));
+  assert(writes.every(call => call[0] === 'delete'));
+  assert.equal(writes.length, 7);
+  const deletedIds = writes.map(call => call[1].split('/').pop()).sort();
+  assert.deepEqual(deletedIds, retiredNames.map((_, index) => `retired-${index}`).sort());
+  assert(!writes.some(call => call[1].endsWith('/unrelated-id')));
 });
 
-test('command deployment updates only its managed names instead of replacing all global commands', async () => {
-  const initial = [{ id: 'legacy-id', name: 'legacy', description: 'Unmanaged' }];
-  const { calls, rest } = fakeRest(initial);
-  const result = await deploy({
-    env: { DISCORD_TOKEN: 'token' },
-    rest,
-    config,
-    apply: true
-  });
-  assert.equal(result.applied, true);
-  assert.deepEqual(calls.filter(call => ['post', 'patch', 'delete'].includes(call[0])).map(call => call[0]), ['post']);
-  assert.equal(calls.find(call => call[0] === 'post')[2], 'pin');
+test('command cleanup is a no-op once the retired commands are gone', async () => {
+  const { calls, rest } = fakeRest([registered.at(-1)]);
+  const result = await deploy({ env: { DISCORD_TOKEN: 'token' }, rest, config, apply: true });
+  assert.deepEqual(result.diff.remove, []);
+  assert.equal(result.diff.preserve, 1);
+  assert(calls.every(call => !['post', 'patch', 'delete'].includes(call[0])));
+});
+
+test('command cleanup aborts if the application command list changes during review', async () => {
+  const { calls, rest } = fakeRest(registered, current => [...current, { id: 'new-id', name: 'other', description: 'Concurrent' }]);
+  await assert.rejects(() => deploy({ env: { DISCORD_TOKEN: 'token' }, rest, config, apply: true }), /changed during review/);
+  assert(calls.every(call => call[0] !== 'post' && call[0] !== 'patch' && call[0] !== 'delete'));
 });

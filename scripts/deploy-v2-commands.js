@@ -1,77 +1,29 @@
 'use strict';
 
 require('dotenv').config();
-const { SlashCommandBuilder, REST, Routes } = require('discord.js');
+const { REST, Routes } = require('discord.js');
 const { loadConfig } = require('../src/config/load-config');
 
-const commands = [
-  new SlashCommandBuilder()
-    .setName('dino-fulfillment')
-    .setDescription('Fulfill a creature to a verified online player')
-    .addStringOption(option => option.setName('server').setDescription('Configured ARK server ID').setRequired(true))
-    .addStringOption(option => option.setName('creature').setDescription('Approved creature ID').setRequired(true)),
-  new SlashCommandBuilder()
-    .setName('player-link')
-    .setDescription('Verify an observed online ARK identity for a Discord user')
-    .addStringOption(option => option.setName('server').setDescription('Configured ARK server ID').setRequired(true))
-    .addUserOption(option => option.setName('user').setDescription('Discord user to link').setRequired(true)),
-  new SlashCommandBuilder()
-    .setName('player-name')
-    .setDescription('Submit your in-game player name')
-    .addSubcommand(subcommand => subcommand.setName('submit').setDescription('Submit a player name for verification')),
-  new SlashCommandBuilder()
-    .setName('player-name-verify')
-    .setDescription('Verify a pending player-name submission')
-    .addStringOption(option => option.setName('discord-id').setDescription('Discord user ID').setRequired(true)),
-  new SlashCommandBuilder()
-    .setName('ticket')
-    .setDescription('Create or manage a support ticket')
-    .addSubcommand(subcommand => subcommand.setName('create').setDescription('Create a support ticket')
-      .addStringOption(option => option.setName('type').setDescription('Ticket category').setRequired(true)
-        .addChoices(
-          { name: 'Support', value: 'SUPPORT' },
-          { name: 'PIN', value: 'PIN' },
-          { name: 'Player name', value: 'PLAYER_NAME' },
-          { name: 'Shop', value: 'SHOP' },
-          { name: 'Fulfillment', value: 'FULFILLMENT' }
-        ))
-      .addStringOption(option => option.setName('description').setDescription('Describe your request').setRequired(true)))
-    .addSubcommand(subcommand => subcommand.setName('claim').setDescription('Claim an open ticket')
-      .addStringOption(option => option.setName('ticket-id').setDescription('Ticket reference').setRequired(true)))
-    .addSubcommand(subcommand => subcommand.setName('close').setDescription('Close a ticket')
-      .addStringOption(option => option.setName('ticket-id').setDescription('Ticket reference').setRequired(true)))
-    .addSubcommand(subcommand => subcommand.setName('reopen').setDescription('Reopen a closed ticket')
-      .addStringOption(option => option.setName('ticket-id').setDescription('Ticket reference').setRequired(true))),
-  new SlashCommandBuilder()
-    .setName('pin')
-    .setDescription('Submit or manage a PIN request')
-    .addSubcommand(subcommand => subcommand.setName('request').setDescription('Submit a PIN privately'))
-    .addSubcommand(subcommand => subcommand.setName('approve').setDescription('Approve a pending PIN request')
-      .addStringOption(option => option.setName('request-id').setDescription('PIN request reference').setRequired(true)))
-    .addSubcommand(subcommand => subcommand.setName('deliver').setDescription('Privately deliver an approved PIN request')
-      .addStringOption(option => option.setName('request-id').setDescription('PIN request reference').setRequired(true)))
-    .addSubcommand(subcommand => subcommand.setName('cancel').setDescription('Cancel a PIN request')
-      .addStringOption(option => option.setName('request-id').setDescription('PIN request reference').setRequired(true))),
-  new SlashCommandBuilder()
-    .setName('shop-search')
-    .setDescription('Search the creature catalog')
-    .addStringOption(option => option.setName('query').setDescription('Creature name or keyword').setRequired(true))
-    .addIntegerOption(option => option.setName('page').setDescription('Result page').setMinValue(1))
-].map(command => command.toJSON());
+// Every V2 flow is driven by the persistent server panels, so no slash commands are registered.
+const commands = Object.freeze([]);
 
-const managedNames = new Set(commands.map(command => command.name));
+// Slash commands that earlier V2 releases registered and the panels replaced. They stay managed so a
+// deploy removes them from Discord; unrelated commands on the application are always preserved.
+const RETIRED_COMMAND_NAMES = Object.freeze([
+  'dino-fulfillment',
+  'player-link',
+  'player-name',
+  'player-name-verify',
+  'ticket',
+  'pin',
+  'shop-search'
+]);
+
+const managedNames = new Set([...commands.map(command => command.name), ...RETIRED_COMMAND_NAMES]);
 
 function commandsForFeatures(features) {
-  const enabled = {
-    'dino-fulfillment': features?.fulfillment === true,
-    'player-link': features?.fulfillment === true && features?.playerNames === true,
-    'player-name': features?.playerNames === true,
-    'player-name-verify': features?.playerNames === true,
-    ticket: features?.tickets === true,
-    pin: features?.pins === true,
-    'shop-search': features?.shop === true
-  };
-  return commands.filter(command => enabled[command.name] === true);
+  void features;
+  return commands.filter(command => !RETIRED_COMMAND_NAMES.includes(command.name));
 }
 
 function mergeCommands(existing, features) {
@@ -164,4 +116,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { commandDiff, commands, commandsForFeatures, deploy, mergeCommands };
+module.exports = { RETIRED_COMMAND_NAMES, commandDiff, commands, commandsForFeatures, deploy, mergeCommands };

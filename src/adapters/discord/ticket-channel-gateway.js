@@ -35,6 +35,8 @@ function ticketControls(record) {
       type:ComponentType.Button, custom_id:`v2:ticket:reopen:${record.id}`,
       label:'Reopen Ticket', style:ButtonStyle.Secondary
     }] : [
+      ...(record.state === 'OPEN' ? [{ type:ComponentType.Button, custom_id:`v2:ticket:claim:${record.id}`,
+        label:'Claim Ticket', style:ButtonStyle.Primary }] : []),
       { type:ComponentType.Button, custom_id:`v2:ticket:complete:${record.id}`,
         label:'Ticket Completed', style:ButtonStyle.Success, disabled:record.state === 'COMPLETED' },
       { type:ComponentType.Button, custom_id:`v2:ticket:close:${record.id}`,

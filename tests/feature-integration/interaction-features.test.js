@@ -1,50 +1,78 @@
-'use strict';
+﻿'use strict';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createDiscordAdapter } = require('../../src/adapters/discord/adapter');
+const { STALE_COMMAND_MESSAGE } = require('../../src/adapters/discord/stale-command-listener');
+const { ticketControls } = require('../../src/adapters/discord/ticket-channel-gateway');
+const { assertUniqueCustomIds } = require('../helpers/custom-ids');
 
-const identity = { id: '10000000000000001' };
+const identity = { id: '10000000000000001', username: 'survivor' };
+const GUILD = '10000000000000002';
+const NAMES_CHANNEL = '10000000000000003';
+const REQUESTS = '10000000000000006';
+const TICKET_CHANNEL = '10000000000000009';
+const PIN_DASHBOARD = '10000000000000010';
+const panelMessage = channelId => `${channelId}1`;
 
-function makeInteraction(commandName, subcommand, values = {}) {
+function baseInteraction(overrides = {}) {
   const replies = [];
-  return {
+  const interaction = {
     replies,
-    commandName,
     user: identity,
-    guildId: '10000000000000002',
-    channelId: '10000000000000003',
+    guildId: GUILD,
+    channelId: REQUESTS,
     member: { roleIds: [] },
     deferred: false,
     replied: false,
-    deferReply: async function () { this.deferred = true; },
-    editReply: async payload => replies.push(payload),
-    isChatInputCommand: () => true,
+    isChatInputCommand: () => false,
     isButton: () => false,
     isModalSubmit: () => false,
-    options: {
-      getSubcommand: () => subcommand,
-      getString: name => values[name],
-      getInteger: name => values[name]
-    },
-    reply: async payload => replies.push(payload),
-    showModal: async modal => { this.modal = modal; }
+    isStringSelectMenu: () => false,
+    deferReply: async () => { interaction.deferred = true; },
+    editReply: async payload => { replies.push(payload); return { id: '10000000000000099' }; },
+    followUp: async payload => replies.push(payload),
+    reply: async payload => { interaction.replied = true; replies.push(payload); },
+    showModal: async modal => { interaction.modal = modal.toJSON(); },
+    ...overrides
   };
+  return interaction;
 }
+
+const button = (customId, overrides = {}) => baseInteraction({ customId, isButton: () => true, ...overrides });
 
 function makeAdapter(overrides = {}) {
   const listeners = [];
-  const calls = { ticket: null, pin: null, pinMessage: null, playerName: null, logs: [] };
+  const panels = new Map();
+  const calls = { tickets: [], pin: null, pinMessage: null, playerName: null, logs: [] };
   const client = {
+    user: { id: '10000000000000050' },
     on: (event, listener) => { if (event === 'interactionCreate') listeners.push(listener); },
-    off: () => {},
+    off: (event, listener) => {
+      const index = listeners.indexOf(listener);
+      if (event === 'interactionCreate' && index >= 0) listeners.splice(index, 1);
+    },
+    isReady: () => true,
     login: async () => {},
     destroy: async () => {},
+    channels: {
+      fetch: async id => ({
+        id, guildId: GUILD,
+        send: async () => ({ id: panelMessage(id) }),
+        messages: { fetch: async () => { throw Object.assign(new Error('Unknown Message'), { code: 10008 }); } }
+      })
+    },
     users: {
       fetch: async id => ({
         send: async content => { calls.pinMessage = { id, content }; }
       })
     }
+  };
+  const ticketResult = action => async input => {
+    calls.tickets.push({ action, input });
+    return action === 'create'
+      ? { id: 't', state: 'OPEN', channelStatus: 'ACTIVE', channelId: TICKET_CHANNEL }
+      : { id: 't', state: { claim: 'CLAIMED', complete: 'COMPLETED', close: 'CLOSED', reopen: 'OPEN' }[action] };
   };
   const services = {
     authorization: { authorize() {} },
@@ -52,7 +80,10 @@ function makeAdapter(overrides = {}) {
     fulfillment: {},
     onlinePlayers: {},
     catalogManager: {},
-    dashboardPanels: { get: async () => null, save: async () => {} },
+    dashboardPanels: {
+      get: async key => panels.get(key) || null,
+      save: async record => { panels.set(record.panelKey, record); }
+    },
     playerNames: {
       submit: async input => { calls.playerName = input; return { id: 'p', state: 'PENDING' }; },
       verify: async () => ({ id: 'p', state: 'VERIFIED' })
@@ -60,10 +91,11 @@ function makeAdapter(overrides = {}) {
     tickets: {
       connectChannels() {},
       recoverChannels: async () => {},
-      create: async input => { calls.ticket = input; return { id: 't', state: 'OPEN' }; },
-      claim: async () => ({ id: 't', state: 'CLAIMED' }),
-      close: async () => ({ id: 't', state: 'CLOSED' }),
-      reopen: async () => ({ id: 't', state: 'OPEN' })
+      create: ticketResult('create'),
+      claim: ticketResult('claim'),
+      complete: ticketResult('complete'),
+      close: ticketResult('close'),
+      reopen: ticketResult('reopen')
     },
     pins: {
       request: async input => { calls.pin = input; return { id: 'pin', state: 'PENDING' }; },
@@ -74,16 +106,16 @@ function makeAdapter(overrides = {}) {
       },
       cancel: async () => ({ id: 'pin', state: 'CANCELED' })
     },
-    shop: { search: async () => ({ items: [] }) },
+    shop: { search: async () => ({ results: [] }) },
     ...overrides
   };
   const adapter = createDiscordAdapter({
     client,
     config: {
       features: { playerNames: true, tickets: true, pins: true, shop: true },
-      discord: { tokenSecret: 'DISCORD_TOKEN', guildId: '10000000000000002',
+      discord: { tokenSecret: 'DISCORD_TOKEN', guildId: GUILD,
         roles: { staff: '10000000000000005' },
-        channels: { playerNames: '10000000000000003', requests: '10000000000000006',
+        channels: { playerNames: NAMES_CHANNEL, requests: REQUESTS, pinsDashboard: PIN_DASHBOARD,
           ticketLogs: '10000000000000007', ticketCategory: '10000000000000008' } }
     },
     env: { DISCORD_TOKEN: 'test-token' },
@@ -94,98 +126,127 @@ function makeAdapter(overrides = {}) {
 }
 
 async function dispatch(listeners, interaction) {
-  for (const listener of listeners) await listener(interaction);
+  for (const listener of [...listeners]) await listener(interaction);
 }
 
-test('ticket creation passes the description service contract', async () => {
+test('Open Request on the active request panel creates a private ticket and links its channel', async () => {
   const { adapter, listeners, calls } = makeAdapter();
   await adapter.start();
-  const interaction = makeInteraction('ticket', 'create', { type: 'SUPPORT', description: 'Help please' });
+  const interaction = button('v2:request:open', { message: { id: panelMessage(REQUESTS) } });
   await dispatch(listeners, interaction);
-  assert.equal(calls.ticket.description, 'Help please');
-  assert.equal(Object.hasOwn(calls.ticket, 'text'), false);
+  assert.equal(calls.tickets.length, 1);
+  const { action, input } = calls.tickets[0];
+  assert.equal(action, 'create');
+  assert.equal(input.type, 'SUPPORT');
+  assert.equal(input.username, identity.username);
+  assert.equal(typeof input.description, 'string');
+  assert.equal(input.context.channelId, REQUESTS);
+  assert.equal(interaction.replies.at(-1).content, `Ticket created: <#${TICKET_CHANNEL}>`);
+
+  const stale = button('v2:request:open', { message: { id: '10000000000000077' } });
+  await dispatch(listeners, stale);
+  assert.equal(calls.tickets.length, 1);
+  assert.equal(stale.replies.length, 1);
   await adapter.stop();
 });
 
-test('PIN and player-name submissions have reachable private modal flows', async () => {
+test('ticket channel buttons claim, complete, close and reopen through the bound ticket message', async () => {
   const { adapter, listeners, calls } = makeAdapter();
   await adapter.start();
-  const pinCommand = makeInteraction('pin', 'request');
-  let pinModal;
-  pinCommand.showModal = async modal => { pinModal = modal.toJSON(); };
-  await dispatch(listeners, pinCommand);
-  assert.equal(pinModal.custom_id, 'v2:pin:request');
-  assert.equal(pinModal.components[0].components[0].custom_id, 'pin');
-  const pinModalInteraction = {
-    user: identity, guildId: pinCommand.guildId, channelId: pinCommand.channelId,
-    member: { roleIds: [] }, isModalSubmit: () => true, isChatInputCommand: () => false,
-    isButton: () => false, customId: 'v2:pin:request',
-    fields: { getTextInputValue: () => '0123' }, reply: async () => {}
-  };
-  await dispatch(listeners, pinModalInteraction);
+  for (const action of ['claim', 'complete', 'close', 'reopen']) {
+    const interaction = button(`v2:ticket:${action}:TKT-1`, { channelId: TICKET_CHANNEL, message: { id: '10000000000000020' } });
+    await dispatch(listeners, interaction);
+    const call = calls.tickets.at(-1);
+    assert.equal(call.action, action);
+    assert.equal(call.input.ticketId, 'TKT-1');
+    assert.equal(call.input.context.messageId, '10000000000000020');
+    assert.equal(interaction.replies.length, 1);
+  }
+  await dispatch(listeners, button('v2:ticket:delete:TKT-1', { channelId: TICKET_CHANNEL, message: { id: '10000000000000020' } }));
+  assert.equal(calls.tickets.length, 4);
+  await adapter.stop();
+});
+
+test('ticket controls offer Claim only while a ticket is open and keep unique custom IDs', () => {
+  const labels = state => ticketControls({ id: 'TKT-1', state })[0].components.map(component => component.label);
+  assert.deepEqual(labels('OPEN'), ['Claim Ticket', 'Ticket Completed', 'Close Ticket']);
+  assert.deepEqual(labels('CLAIMED'), ['Ticket Completed', 'Close Ticket']);
+  assert.deepEqual(labels('COMPLETED'), ['Ticket Completed', 'Close Ticket']);
+  assert.deepEqual(labels('CLOSED'), ['Reopen Ticket']);
+  for (const state of ['OPEN', 'CLAIMED', 'COMPLETED', 'CLOSED']) {
+    assertUniqueCustomIds({ components: ticketControls({ id: 'TKT-1', state }) });
+  }
+});
+
+test('PIN and player-name modals submit through their services', async () => {
+  const { adapter, listeners, calls } = makeAdapter();
+  await adapter.start();
+  await dispatch(listeners, baseInteraction({
+    channelId: NAMES_CHANNEL, isModalSubmit: () => true, customId: 'v2:pin:request',
+    fields: { getTextInputValue: () => '0123' }
+  }));
   assert.equal(calls.pin.pin, '0123');
 
-  const nameCommand = makeInteraction('player-name', 'submit');
-  let nameModal;
-  nameCommand.showModal = async modal => { nameModal = modal.toJSON(); };
-  await dispatch(listeners, nameCommand);
-  assert.equal(nameModal.custom_id, 'v2:player-name:submit');
-  const nameModalInteraction = {
-    user: identity, guildId: nameCommand.guildId, channelId: nameCommand.channelId,
-    member: { roleIds: [] }, isModalSubmit: () => true, isChatInputCommand: () => false,
-    isButton: () => false, customId: 'v2:player-name:submit',
-    fields: { getTextInputValue: () => 'Survivor' }, reply: async () => {}
-  };
-  await dispatch(listeners, nameModalInteraction);
+  const setName = button('v2:player-name:set', { channelId: NAMES_CHANNEL, message: { id: panelMessage(NAMES_CHANNEL) } });
+  await dispatch(listeners, setName);
+  assert.equal(setName.modal.custom_id, 'v2:player-name:submit');
+  await dispatch(listeners, baseInteraction({
+    channelId: NAMES_CHANNEL, isModalSubmit: () => true, customId: 'v2:player-name:submit',
+    fields: { getTextInputValue: () => 'Survivor' }
+  }));
   assert.deepEqual(calls.playerName, { discordId: identity.id, playerName: 'Survivor' });
   await adapter.stop();
 });
 
-test('approved PIN delivery privately messages the request owner without exposing the PIN in the interaction reply', async () => {
+test('Deliver button privately messages the request owner without exposing the PIN in the interaction reply', async () => {
   const { adapter, listeners, calls } = makeAdapter();
   await adapter.start();
-  const interaction = makeInteraction('pin', 'deliver', { 'request-id': 'PIN-1' });
-  interaction.deferred = true;
-  interaction.editReply = async payload => interaction.replies.push(payload);
+  const interaction = button('v2:pin:deliver:PIN-1', { channelId: PIN_DASHBOARD, message: { id: '10000000000000030' } });
   await dispatch(listeners, interaction);
   assert.deepEqual(calls.pinMessage, {
     id: identity.id,
     content: 'Your approved vault PIN is **0123**. Do not share it.'
   });
+  assert.equal(interaction.replies.length, 1);
   assert(!JSON.stringify(interaction.replies).includes('0123'));
-  await adapter.stop();
-});
-
-test('shop search renders the service results and nested DLC warning', async () => {
-  const { adapter, listeners } = makeAdapter({
-    shop: { search: async () => ({ results: [{ name: 'Rex', dlc: { warning: 'Requires access to Genesis.' } }] }) }
-  });
-  await adapter.start();
-  const interaction = makeInteraction('shop-search', null, { query: 'rex', page: 1 });
-  interaction.deferReply = async () => { interaction.deferred = true; };
-  interaction.editReply = async payload => interaction.replies.push(payload);
-  await dispatch(listeners, interaction);
-  assert.match(interaction.replies[0].content, /Rex - Requires access to Genesis/);
   await adapter.stop();
 });
 
 test('async feature failures log safe metadata and reply once with a generic message', async () => {
   const secretError = new Error('private database path C:\\secret\\db.sqlite');
-  const { adapter, listeners, calls } = makeAdapter({ shop: { search: async () => { throw secretError; } } });
+  const { adapter, listeners, calls } = makeAdapter({
+    playerNames: { submit: async () => { throw secretError; }, verify: async () => ({}) }
+  });
   await adapter.start();
-  const replies = [];
-  const interaction = {
-    ...makeInteraction('shop-search', null, { query: 'rex', page: 1 }),
-    deferred: false,
-    deferReply: async () => { interaction.deferred = true; },
-    editReply: async payload => replies.push(payload),
-    followUp: async payload => replies.push(payload)
-  };
+  const interaction = baseInteraction({
+    channelId: NAMES_CHANNEL, isModalSubmit: () => true, customId: 'v2:player-name:submit',
+    fields: { getTextInputValue: () => 'Survivor' }
+  });
   await dispatch(listeners, interaction);
-  assert.equal(replies.length, 1);
-  assert.match(replies[0].content, /could not be completed safely/);
-  assert(!JSON.stringify(replies).includes('secret'));
-  assert.equal(calls.logs[0].type, 'discord.interaction.failed');
+  assert.equal(interaction.replies.length, 1);
+  assert.match(interaction.replies[0].content, /could not be completed safely/);
+  assert(!JSON.stringify(interaction.replies).includes('secret'));
+  assert.equal(calls.logs.filter(event => event.type === 'discord.interaction.failed').length, 1);
   assert(!JSON.stringify(calls.logs).includes(secretError.message));
   await adapter.stop();
+});
+
+test('retired slash commands get one private panel pointer and never reach a service', async () => {
+  const { adapter, listeners, calls } = makeAdapter();
+  await adapter.start();
+  for (const commandName of ['ticket', 'pin', 'player-name', 'player-name-verify', 'player-link', 'dino-fulfillment', 'shop-search']) {
+    const interaction = baseInteraction({
+      commandName, isChatInputCommand: () => true,
+      options: { getSubcommand: () => 'create', getString: () => 'x', getInteger: () => 1, getUser: () => identity }
+    });
+    await dispatch(listeners, interaction);
+    assert.deepEqual(interaction.replies, [{ content: STALE_COMMAND_MESSAGE, flags: 64 }]);
+  }
+  assert.equal(calls.tickets.length, 0);
+  assert.equal(calls.pin, null);
+  assert.equal(calls.playerName, null);
+  assert.deepEqual(calls.logs.filter(event => event.type === 'discord.command.retired').map(event => event.data.command),
+    ['ticket', 'pin', 'player-name', 'player-name-verify', 'player-link', 'dino-fulfillment', 'shop-search']);
+  await adapter.stop();
+  assert.equal(listeners.length, 0);
 });

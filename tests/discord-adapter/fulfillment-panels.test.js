@@ -92,6 +92,8 @@ test('paged catalog -> creature -> map -> trusted online player -> danger confir
   const creature = await chooseCreature(router, previous);
   assert(component(creature, 'Back to Catalog'));
   const players = await chooseMap(router, creature);
+  assert.deepEqual(calls.scan, [{ serverId: 'map-one', ttlMs: 120000 }]);
+  assert.equal(calls.begin.length, 0);
   const menu = component(players, 'Select an online player');
   assert.equal(menu.options[0].value, 'trusted-ref');
   const review = await router.handle(interaction('select', menu.custom_id, ['trusted-ref']));

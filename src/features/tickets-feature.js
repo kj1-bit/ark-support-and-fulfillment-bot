@@ -3,7 +3,7 @@
 const { ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const { defineFeature } = require('./feature-contract');
 const { toInteractionContext } = require('../adapters/discord/interaction-context');
-const { isButton, isChatInput, respond, safePublicRecord, ephemeral } = require('../adapters/discord/interaction-protocol');
+const { isButton, respond, safePublicRecord, ephemeral } = require('../adapters/discord/interaction-protocol');
 const { registerInteractionListener } = require('../adapters/discord/interaction-listener');
 const { createPersistentPanel } = require('../adapters/discord/persistent-panel');
 const { createTicketChannelGateway } = require('../adapters/discord/ticket-channel-gateway');
@@ -48,15 +48,7 @@ function createTicketsFeature() {
       listener = registerInteractionListener(context, 'tickets', async interaction => {
         let action;
         let input;
-        if (isChatInput(interaction) && interaction.commandName === 'ticket') {
-          action = interaction.options.getSubcommand();
-          input = { context:toInteractionContext(interaction) };
-          if (action === 'create') {
-            input.type = interaction.options.getString('type', true);
-            input.description = interaction.options.getString('description', true);
-            input.username = interaction.user.username;
-          } else input.ticketId = interaction.options.getString('ticket-id', true);
-        } else if (isButton(interaction) && interaction.customId === 'v2:request:open') {
+        if (isButton(interaction) && interaction.customId === 'v2:request:open') {
           if (!panel.matches(interaction)) throw new Error('This request panel is no longer valid.');
           action = 'create';
           input = { type:'SUPPORT', description:'Please describe your request in the private ticket channel.',
@@ -75,7 +67,8 @@ function createTicketsFeature() {
         }
         return respond(interaction, safePublicRecord(result,
           action === 'close' ? 'Ticket closed. It remains staff-visible until automatic deletion.'
-            : action === 'complete' ? 'Ticket marked completed. The channel remains open.' : 'Ticket updated.'));
+            : action === 'complete' ? 'Ticket marked completed. The channel remains open.'
+              : action === 'claim' ? 'Ticket claimed.' : 'Ticket updated.'));
       });
     },
     async start(context) {

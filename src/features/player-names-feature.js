@@ -1,9 +1,8 @@
 'use strict';
 
 const { defineFeature } = require('./feature-contract');
-const { toInteractionContext } = require('../adapters/discord/interaction-context');
 const { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-const { isChatInput, isModal, isButton, respond, safePublicRecord } = require('../adapters/discord/interaction-protocol');
+const { isModal, isButton, respond, safePublicRecord } = require('../adapters/discord/interaction-protocol');
 const { registerInteractionListener } = require('../adapters/discord/interaction-listener');
 const { createPersistentPanel } = require('../adapters/discord/persistent-panel');
 const { createFulfillmentController } = require('../adapters/discord/fulfillment-controller');
@@ -40,14 +39,6 @@ function createPlayerNamesFeature() {
           const result = await context.services.playerNames.submit({ discordId: interaction.user.id,
             playerName: interaction.fields.getTextInputValue('player-name') });
           return respond(interaction, safePublicRecord(result, 'Player name submitted.'));
-        }
-        if (isChatInput(interaction) && interaction.commandName === 'player-name'
-          && interaction.options.getSubcommand() === 'submit') return interaction.showModal(playerNameModal());
-        if (isChatInput(interaction) && interaction.commandName === 'player-name-verify') {
-          const result = await context.services.playerNames.verify({
-            discordId: interaction.options.getString('discord-id', true), moderatorId: interaction.user.id,
-            context: toInteractionContext(interaction) });
-          return respond(interaction, safePublicRecord(result, 'Player name verified.'));
         }
         return router ? router.handle(interaction) : false;
       });

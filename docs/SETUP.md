@@ -1,6 +1,8 @@
-# Complete setup guide
+# Legacy V1 setup guide
 
-This guide takes a new operator from an empty Discord application to a running Ticketbot installation. Complete the Discord-only setup first, run the bot in mock mode, and enable live RCON last.
+> **This guide is for the existing V1 application only.** It uses V1 `.env` settings, `index.js`, and `deploy-commands.js`; it does not configure or start V2. For the V2 architecture, configuration, feature behavior, and test-readiness requirements, start with the [V2 guide](V2_GUIDE.md). Do not point V2 at V1 production resources during initial testing.
+
+This guide takes a new operator from an empty Discord application to a running V1 Ticketbot installation. Complete the Discord-only setup first, run the bot in mock mode, and enable live RCON last.
 
 ## 1. Requirements
 
@@ -399,7 +401,7 @@ Do not publish backups containing credentials, PINs, player names, ticket histor
 
 Discord cannot deploy, update, restart, or execute host commands.
 
-Follow `docs/V2_DEPLOYMENT.md` and the installation-specific private operations runbook. During an approved deployment, rerun `node deploy-commands.js` to synchronize the registered Discord commands with the reviewed source.
+V1 deployment and rollback must follow the V1 installation's private operations runbook. The [V2 deployment document](V2_DEPLOYMENT.md) describes the separate V2 security boundary and is not a V1 deployment procedure. During an approved V1 deployment, rerun `node deploy-commands.js` to synchronize V1's registered Discord commands with the reviewed source.
 
 ## 18. Troubleshooting
 

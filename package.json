@@ -4,7 +4,7 @@
     "description":  "",
     "main":  "index.js",
     "scripts":  {
-                    "test":  "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js tests/v2-core/*.test.js tests/persistence/*.test.js tests/composition/*.test.js tests/trusted-state/*.test.js tests/persistent-trusted-state/*.test.js tests/persistent-runtime/*.test.js tests/discord-adapter/*.test.js tests/discord-lifecycle/*.test.js tests/feature-contracts/*.test.js tests/feature-integration/*.test.js tests/player-names/*.test.js tests/player-names-runtime/*.test.js tests/tickets/*.test.js tests/ticket-runtime/*.test.js tests/pins/*.test.js tests/pin-runtime/*.test.js tests/shop/*.test.js tests/shop-runtime/*.test.js tests/dashboards/*.test.js tests/dashboard-runtime/*.test.js tests/hardening/*.test.js tests/review-remediation/*.test.js",
+                    "test":  "node --test tests/config/*.test.js tests/bootstrap/*.test.js tests/security/*.test.js tests/v2-core/*.test.js tests/persistence/*.test.js tests/composition/*.test.js tests/trusted-state/*.test.js tests/persistent-trusted-state/*.test.js tests/persistent-runtime/*.test.js tests/discord-adapter/*.test.js tests/discord-lifecycle/*.test.js tests/feature-contracts/*.test.js tests/feature-integration/*.test.js tests/player-names/*.test.js tests/player-names-runtime/*.test.js tests/tickets/*.test.js tests/ticket-runtime/*.test.js tests/pins/*.test.js tests/pin-runtime/*.test.js tests/shop/*.test.js tests/shop-runtime/*.test.js tests/dashboards/*.test.js tests/dashboard-runtime/*.test.js tests/hardening/*.test.js tests/review-remediation/*.test.js tests/debian-launcher/*.test.js",
                     "test:config":  "node --test tests/config/*.test.js",
                     "config:validate":  "node scripts/validate-config.js",
                     "test:bootstrap":  "node --test tests/bootstrap/*.test.js",
@@ -30,7 +30,8 @@
                     "test:dashboards":  "node --test tests/dashboards/*.test.js",
                     "test:dashboard-runtime":  "node --test tests/dashboard-runtime/*.test.js",
                     "test:hardening":  "node --test tests/hardening/*.test.js",
-                    "commands:v2:deploy":  "node scripts/deploy-v2-commands.js"
+                    "commands:v2:deploy":  "node scripts/deploy-v2-commands.js",
+                    "start:v2": "node scripts/start-v2.js"
                 },
     "keywords":  [
 
@@ -46,5 +47,8 @@
     "license":  "CC0-1.0",
     "allowScripts":  {
                          "sqlite3@6.0.1":  true
-                     }
+                     },
+                         "engines": {
+                             "node": ">=22"
+                         }
 }

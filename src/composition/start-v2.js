@@ -48,12 +48,22 @@ async function startV2(options = {}) {
     await discord.start();
     if (runtime.retention) {
       runtime.retention.start();
-      void runtime.retention.runOnce().catch(() => {});
+      void runtime.retention.runOnce().catch(() => writeSummary({
+        type: 'runtime.retention.initial_run_failed',
+        at: new Date().toISOString()
+      }));
     }
   } catch (error) {
-    await runtime?.retention?.stop().catch(() => {});
-    if (database && typeof database.close === 'function') {
-      await database.close().catch(() => {});
+    const cleanup = [];
+    if (runtime?.retention) cleanup.push(() => runtime.retention.stop());
+    if (discord && typeof discord.stop === 'function') cleanup.push(() => discord.stop());
+    if (database && typeof database.close === 'function') cleanup.push(() => database.close());
+    for (const close of cleanup) {
+      try {
+        await close();
+      } catch {
+        // Preserve the startup failure while still attempting remaining cleanup.
+      }
     }
     throw error;
   }
@@ -61,9 +71,19 @@ async function startV2(options = {}) {
   const stop = async () => {
     if (stopped) return;
     stopped = true;
-    await runtime.retention?.stop();
-    if (typeof discord.stop === 'function') await discord.stop();
-    if (typeof database.close === 'function') await database.close();
+    const failures = [];
+    for (const close of [
+      () => runtime.retention?.stop(),
+      () => typeof discord.stop === 'function' ? discord.stop() : undefined,
+      () => typeof database.close === 'function' ? database.close() : undefined
+    ]) {
+      try {
+        await close();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length) throw new AggregateError(failures, 'V2 shutdown was incomplete.');
   };
   return Object.freeze({ config, database, runtime, discord, stop });
 }

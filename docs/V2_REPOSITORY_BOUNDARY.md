@@ -2,6 +2,8 @@
 
 This document defines the source, deployment, secret, runtime, and generated-data boundaries for Ticketbot V2. It records the current V1/public-repository state and the required V2 destination state without exposing secret values or private infrastructure details.
 
+> **Historical inventory and design boundary.** The branch, starting commit, V1 inventory, and “future V2” ownership stages below describe the snapshot when this inventory was written. They are not a current startup recipe. For actual V2 paths and status use the [V2 guide](V2_GUIDE.md); for Debian staging use the [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md). The root `index.js` remains V1; the V2 executable is `scripts/start-v2.js`.
+
 ## Status and scope
 
 - Repository: `kj1-bit/ark-support-and-fulfillment-bot`

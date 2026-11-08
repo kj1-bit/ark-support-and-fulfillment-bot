@@ -1,4 +1,6 @@
-# Features and operating guide
+# Legacy V1 features and operating guide
+
+> This page documents the existing V1 application (`index.js`, `features/`, and `services/`). It is not a description of V2 runtime behavior. For V2, use the [V2 guide](V2_GUIDE.md) and its source-path map.
 
 This document explains what each user-facing and staff-facing feature is intended to do, who can use it, and what data it stores.
 

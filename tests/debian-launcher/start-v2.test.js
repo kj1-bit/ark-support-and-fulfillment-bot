@@ -1,0 +1,144 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { createRconTransport, parseOnlinePlayers } = require('../../src/adapters/rcon/tcp-transport');
+const { loadInitialCatalog } = require('../../src/composition/load-initial-catalog');
+const { createLauncherOptions, startV2Service } = require('../../scripts/start-v2');
+const { createCreatureRegistry } = require('../../src/registries/creature-registry');
+
+test('catalog loader creates a deterministic content-addressed V2 version', () => {
+  const catalogPath = path.resolve(__dirname, '../../data/dino-catalog.json');
+  const first = loadInitialCatalog(catalogPath);
+  const second = loadInitialCatalog(catalogPath);
+  assert.match(first.version, /^2026\.1\.0-[a-f0-9]{16}$/);
+  assert.equal(first.version, second.version);
+  assert(first.creatures.length > 0);
+  assert(first.creatures.every(creature => creature.enabled && creature.tameable));
+  assert.equal(createCreatureRegistry(first).version, first.version);
+});
+
+test('mock launcher requires a Discord token before SQLite opens when a feature is enabled', () => {
+  const config = {
+    discord: { tokenSecret: 'DISCORD_TOKEN' },
+    features: { shop: true }
+  };
+  const options = createLauncherOptions({ env: {}, loadConfig: () => config });
+  assert.throws(
+    () => options.loadConfig({}),
+    error => error.code === 'CONFIGURATION_INVALID' && error.issues[0].includes('tokenSecret')
+  );
+});
+
+test('ListPlayers parsing returns normalized identities and rejects unknown response formats', () => {
+  assert.deepEqual(parseOnlinePlayers('1. Test Survivor, 0123456789ABCDEF0123456789ABCDEF'), [
+    { displayName: 'Test Survivor', eosId: '0123456789abcdef0123456789abcdef' }
+  ]);
+  assert.deepEqual(parseOnlinePlayers('No Players Connected'), []);
+  assert.throws(() => parseOnlinePlayers('unexpected RCON response'), /could not be parsed/);
+});
+
+test('mock RCON transport is deterministic and does not resolve or connect secrets', async () => {
+  const transport = createRconTransport({ mode: 'mock', env: {} });
+  const server = { id: 'test-map', host: '127.0.0.1', port: 27020, passwordSecret: 'MISSING_SECRET' };
+  assert.equal((await transport.execute({ type: 'listOnlinePlayers', server }))[0].eosId,
+    '0123456789abcdef0123456789abcdef');
+  assert.deepEqual(await transport.execute({
+    type: 'fulfillApprovedCreature', server, operation: { command: 'internal allowlisted command' }
+  }), { success: true });
+});
+
+test('live RCON resolves configured secret, sends only named operations, and redacts transport errors', async () => {
+  const calls = [];
+  class FakeRcon extends EventEmitter {
+    constructor(host, port, password, options) {
+      super();
+      calls.push({ host, port, password, options });
+    }
+    connect() { queueMicrotask(() => this.emit('auth')); }
+    send(command) {
+      calls.push({ command });
+      queueMicrotask(() => this.emit('response', '1. Live Player, 0123456789abcdef0123456789abcdef'));
+    }
+    disconnect() {}
+  }
+  const server = { id: 'test-map', host: 'test.invalid', port: 27020, passwordSecret: 'ARK_SECRET' };
+  const transport = createRconTransport({
+    mode: 'test', env: { ARK_SECRET: 'do-not-log-this' }, timeoutMs: 1000, RconClass: FakeRcon
+  });
+  const players = await transport.execute({ type: 'listOnlinePlayers', server });
+  assert.equal(players[0].displayName, 'Live Player');
+  assert.equal(calls[0].password, 'do-not-log-this');
+  assert.deepEqual(calls[1], { command: 'ListPlayers' });
+
+  class FailingRcon extends EventEmitter {
+    constructor() {}
+    connect() { queueMicrotask(() => this.emit('error', new Error('do-not-log-this'))); }
+    disconnect() {}
+  }
+  const failing = createRconTransport({
+    mode: 'test', env: { ARK_SECRET: 'do-not-log-this' }, timeoutMs: 1000, RconClass: FailingRcon
+  });
+  await assert.rejects(
+    failing.execute({ type: 'listOnlinePlayers', server }),
+    error => !error.message.includes('do-not-log-this') && /test-map/.test(error.message)
+  );
+});
+
+test('Debian launcher wires SQLite migrations and stops cleanly without external network access in mock mode', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ticketbot-v2-launcher-'));
+  const configPath = path.join(root, 'instance.json');
+  const config = {
+    schemaVersion: 1,
+    runtime: { mode: 'mock', environment: 'launcher-test', logLevel: 'error' },
+    discord: {
+      clientId: '10000000000000001',
+      guildId: '10000000000000002',
+      tokenSecret: 'DISCORD_TOKEN',
+      roles: { staff: null, member: null, fulfillmentModerator: null },
+      channels: {
+        ticketCategory: null, vault: null, requests: null, playerNames: null,
+        pinsDashboard: null, ticketLogs: null, fulfillment: null, fulfillmentLogs: null
+      }
+    },
+    ark: {
+      timeoutMs: 1000,
+      servers: [{
+        id: 'test-map', name: 'Test Map', host: '127.0.0.1', port: 27020,
+        passwordSecret: 'ARK_SECRET', enabled: true, testOnly: true,
+        operations: ['listOnlinePlayers', 'fulfillApprovedCreature']
+      }]
+    },
+    storage: { databasePath: 'runtime/database.sqlite', backupPath: 'runtime/backups' },
+    features: { tickets: false, pins: false, playerNames: false, shop: false, fulfillment: false, dashboards: false }
+  };
+  fs.writeFileSync(configPath, JSON.stringify(config));
+  const logs = [];
+  const service = await startV2Service({
+    sourceRoot: root,
+    configPath,
+    catalogPath: path.resolve(__dirname, '../../data/dino-catalog.json'),
+    env: {},
+    write: line => logs.push(line),
+    createDiscordClient: () => ({
+      on() {},
+      off() {},
+      login: async () => { throw new Error('Mock startup must not log in without enabled features.'); },
+      destroy: async () => {}
+    })
+  });
+
+  try {
+    assert.equal(service.runtime.schemaVersion, 10);
+    assert(fs.existsSync(path.join(root, 'runtime', 'database.sqlite')));
+    assert(fs.existsSync(path.join(root, 'runtime', 'backups')));
+    assert(logs.some(line => line.includes('"type":"runtime.config"')));
+  } finally {
+    await service.stop();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

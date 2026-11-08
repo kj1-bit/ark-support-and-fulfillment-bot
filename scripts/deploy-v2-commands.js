@@ -48,6 +48,8 @@ const commands = [
     .addSubcommand(subcommand => subcommand.setName('request').setDescription('Submit a PIN privately'))
     .addSubcommand(subcommand => subcommand.setName('approve').setDescription('Approve a pending PIN request')
       .addStringOption(option => option.setName('request-id').setDescription('PIN request reference').setRequired(true)))
+    .addSubcommand(subcommand => subcommand.setName('deliver').setDescription('Privately deliver an approved PIN request')
+      .addStringOption(option => option.setName('request-id').setDescription('PIN request reference').setRequired(true)))
     .addSubcommand(subcommand => subcommand.setName('cancel').setDescription('Cancel a PIN request')
       .addStringOption(option => option.setName('request-id').setDescription('PIN request reference').setRequired(true))),
   new SlashCommandBuilder()
@@ -80,22 +82,86 @@ function mergeCommands(existing, features) {
   return [...preserved, ...commandsForFeatures(features)];
 }
 
-async function deploy({ env = process.env, rest: suppliedRest, config = loadConfig({ env }) } = {}) {
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
+}
+
+function commandShape(command) {
+  const { id, application_id, guild_id, version, ...shape } = command;
+  return JSON.stringify(canonical(shape));
+}
+
+function publicCommand(command) {
+  const { id, application_id, guild_id, version, ...shape } = command;
+  return canonical(shape);
+}
+
+function commandDiff(existing, desired) {
+  const current = new Map(existing.filter(command => managedNames.has(command.name)).map(command => [command.name, command]));
+  const target = new Map(desired.map(command => [command.name, command]));
+  return Object.freeze({
+    add: Object.freeze([...target.entries()]
+      .filter(([name]) => !current.has(name))
+      .map(([, command]) => publicCommand(command))),
+    remove: Object.freeze([...current.keys()].filter(name => !target.has(name))),
+    update: Object.freeze([...target.entries()]
+      .filter(([name, command]) => current.has(name) && commandShape(current.get(name)) !== commandShape(command))
+      .map(([name, command]) => Object.freeze({
+        name,
+        before: publicCommand(current.get(name)),
+        after: publicCommand(command)
+      }))),
+    preserve: existing.filter(command => !managedNames.has(command.name)).length
+  });
+}
+
+async function deploy({
+  env = process.env,
+  rest: suppliedRest,
+  config = loadConfig({ env }),
+  apply = false
+} = {}) {
   const token = env.DISCORD_TOKEN;
-  const clientId = env.CLIENT_ID;
-  if (!token || !clientId) throw new Error('DISCORD_TOKEN and CLIENT_ID are required.');
+  const clientId = config.discord?.clientId;
+  if (!token || !clientId) throw new Error('DISCORD_TOKEN and config.discord.clientId are required.');
   const rest = suppliedRest || new REST({ version: '10' });
   rest.setToken(token);
-  const route = Routes.applicationCommands(clientId);
-  const existing = await rest.get(route);
-  await rest.put(route, { body: mergeCommands(existing, config.features) });
+  const collectionRoute = Routes.applicationCommands(clientId);
+  const existing = await rest.get(collectionRoute);
+  const desired = commandsForFeatures(config.features);
+  const diff = commandDiff(existing, desired);
+  if (!apply) return Object.freeze({ applied: false, clientId, diff });
+
+  const latest = await rest.get(collectionRoute);
+  if (JSON.stringify(canonical(latest)) !== JSON.stringify(canonical(existing))) {
+    throw new Error('Application commands changed during review; rerun the dry run before applying.');
+  }
+
+  const currentManaged = new Map(existing.filter(command => managedNames.has(command.name)).map(command => [command.name, command]));
+  const targetManaged = new Map(desired.map(command => [command.name, command]));
+  for (const [name, command] of targetManaged) {
+    const current = currentManaged.get(name);
+    if (!current) {
+      await rest.post(collectionRoute, { body: command });
+    } else if (commandShape(current) !== commandShape(command)) {
+      await rest.patch(Routes.applicationCommand(clientId, current.id), { body: command });
+    }
+  }
+  for (const [name, current] of currentManaged) {
+    if (!targetManaged.has(name)) await rest.delete(Routes.applicationCommand(clientId, current.id));
+  }
+  return Object.freeze({ applied: true, clientId, diff });
 }
 
 if (require.main === module) {
-  deploy().then(() => console.log('V2 commands deployed.')).catch(error => {
+  deploy({ apply: process.argv.includes('--apply') }).then(result => {
+    console.log(JSON.stringify({ mode: result.applied ? 'applied' : 'dry-run', ...result }, null, 2));
+  }).catch(error => {
     console.error(error);
     process.exitCode = 1;
   });
 }
 
-module.exports = { commands, commandsForFeatures, deploy, mergeCommands };
+module.exports = { commandDiff, commands, commandsForFeatures, deploy, mergeCommands };

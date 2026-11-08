@@ -113,7 +113,9 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
     const parsed = parseCustomId(interaction.customId);
     if (!parsed) return false;
     if (parsed.action === 'cancel') {
-      return interaction.update({ components: [], content: 'Fulfillment canceled.' });
+      await interaction.deferUpdate();
+      const result = await controller.cancel(interaction, parsed);
+      return interaction.editReply(views.resultView(result));
     }
     await interaction.deferUpdate();
     const result = await controller.confirm(interaction, parsed);

@@ -7,7 +7,7 @@ const SNOWFLAKE = /^[1-9][0-9]{16,19}$/;
 const SERVER_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SECRET_REF = /^[A-Z][A-Z0-9_]{2,127}$/;
 const OPERATIONS = new Set(['listOnlinePlayers', 'fulfillApprovedCreature']);
-const FEATURES = ['tickets', 'pins', 'playerNames', 'shop', 'fulfillment'];
+const FEATURES = ['tickets', 'pins', 'playerNames', 'shop', 'fulfillment', 'dashboards'];
 const TOP_KEYS = new Set(['schemaVersion','runtime','discord','ark','storage','features']);
 function object(v) { return v && typeof v === 'object' && !Array.isArray(v); }
 function addUnknown(obj, allowed, at, issues) {
@@ -85,6 +85,24 @@ function validateConfig(input, options={}) {
       if (!discord?.roles?.fulfillmentModerator) issues.push('configuration.features.fulfillment: fulfillmentModerator role is required');
       if (!discord?.channels?.fulfillment||!discord?.channels?.fulfillmentLogs) issues.push('configuration.features.fulfillment: fulfillment and fulfillmentLogs channels are required');
       if (!Array.isArray(ark?.servers)||!ark.servers.some(s=>s&&s.enabled)) issues.push('configuration.features.fulfillment: at least one server must be enabled');
+    }
+    if (features.playerNames===true) {
+      if (!discord?.roles?.staff) issues.push('configuration.features.playerNames: staff role is required');
+      if (!discord?.channels?.playerNames) issues.push('configuration.features.playerNames: playerNames channel is required');
+    }
+    if (features.tickets===true) {
+      if (!discord?.roles?.staff) issues.push('configuration.features.tickets: staff role is required');
+      if (!discord?.channels?.requests||!discord?.channels?.ticketLogs) issues.push('configuration.features.tickets: requests and ticketLogs channels are required');
+    }
+    if (features.pins===true) {
+      if (!discord?.roles?.staff) issues.push('configuration.features.pins: staff role is required');
+      if (!discord?.channels?.vault||!discord?.channels?.pinsDashboard) issues.push('configuration.features.pins: vault and pinsDashboard channels are required');
+    }
+    if (features.dashboards===true) {
+      if (!discord?.roles?.staff) issues.push('configuration.features.dashboards: staff role is required');
+      if (!discord?.channels?.ticketLogs||!discord?.channels?.pinsDashboard||!discord?.channels?.fulfillmentLogs) {
+        issues.push('configuration.features.dashboards: ticketLogs, pinsDashboard, and fulfillmentLogs channels are required');
+      }
     }
   }
   if ((runtime?.mode==='test'||runtime?.mode==='production')&&discord?.tokenSecret&&!env[discord.tokenSecret]) issues.push('configuration.discord.tokenSecret: required secret is not present');

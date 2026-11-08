@@ -44,6 +44,49 @@ test('fulfillment update fails when the stored state changes concurrently',async
     run:async()=>({changes:0})
   });
 
+  test('fulfillment result persistence stores only bounded, non-sensitive operation summaries',async()=>{
+    const row={
+      id:'FUL-00000000-0000-4000-8000-000000000001',
+      state:'EXECUTING',
+      result_json:null
+    };
+    let serialized;
+    const repository=createSqliteFulfillmentRepository({
+      get:async()=>row,
+      run:async(_sql,args)=>(serialized=args[0],{changes:1})
+    });
+
+    test('migration redacts existing raw fulfillment results while preserving safe summaries',async()=>{
+      const migration=require('../../src/migrations/010-fulfillment-result-redaction');
+      const rows=[
+        {id:'FUL-1',resultJson:JSON.stringify([{success:true,operationIndex:2,command:'secret command',response:'raw output',eosId:'sensitive'}])},
+        {id:'FUL-2',resultJson:'not-json'}
+      ];
+      const updates=[];
+      const database={
+        all:async(_sql,args)=>rows.filter(row=>row.id>args[0]),
+        run:async(_sql,args)=>{updates.push(args);return {changes:1};}
+      };
+      await migration.up(database);
+      assert.deepEqual(updates,[
+        ['[{"success":true,"operationIndex":2}]','FUL-1'],
+        [null,'FUL-2']
+      ]);
+    });
+    await repository.updateResults(row.id,[{
+      success:true,
+      operationIndex:1,
+      command:'admin password',
+      response:'sensitive server output',
+      eosId:'full-identifier'
+    }]);
+    assert.deepEqual(JSON.parse(serialized),[{success:true,operationIndex:1}]);
+    assert(!serialized.includes('password'));
+    assert(!serialized.includes('sensitive'));
+    assert(!serialized.includes('full-identifier'));
+    await assert.rejects(()=>repository.updateResults(row.id,Array.from({length:21},()=>({success:true}))),/at most 20/);
+  });
+
   await assert.rejects(
     ()=>repository.update(
       row.id,

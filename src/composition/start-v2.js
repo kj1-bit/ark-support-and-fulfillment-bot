@@ -35,6 +35,7 @@ async function startV2(options = {}) {
         pins: runtime.pins,
         shop: runtime.shop,
         dashboards: runtime.dashboards,
+        dashboardPanels: runtime.dashboardPanels,
         catalogManager: runtime.catalogManager,
         fulfillment: runtime.fulfillment,
         audit: runtime.audit

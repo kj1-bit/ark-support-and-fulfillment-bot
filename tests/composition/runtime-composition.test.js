@@ -23,7 +23,7 @@ function frozenConfig() {
       servers: Object.freeze([Object.freeze({ id: 'map-one', name: 'Map One', host: '127.0.0.1', port: 27020, passwordSecret: 'ARK_PASSWORD', enabled: true, testOnly: true, operations: Object.freeze(['listOnlinePlayers','fulfillApprovedCreature']) })])
     }),
     storage: Object.freeze({ databasePath: './runtime/test.sqlite', backupPath: './runtime/backups' }),
-    features: Object.freeze({ tickets: true, pins: true, playerNames: true, shop: true, fulfillment: true })
+    features: Object.freeze({ tickets: true, pins: true, playerNames: true, shop: true, fulfillment: true, dashboards: false })
   });
 }
 function fakeDatabase() {
@@ -45,6 +45,27 @@ test('authorization options are derived only from validated configuration',()=>{
   assert.deepEqual(result.capabilities['fulfillment.confirm'].roleIds,[ids.roleId]);
 });
 
+test('missing authorization configuration fails before database backup or migration', async () => {
+  const config = frozenConfig();
+  const invalid = Object.freeze({
+    ...config,
+    discord: Object.freeze({
+      ...config.discord,
+      roles: Object.freeze({ ...config.discord.roles, staff: null })
+    })
+  });
+  const db = fakeDatabase();
+  let backedUp = false;
+  await assert.rejects(() => composeRuntime({
+    config: invalid, database: db, catalog,
+    transport: { execute: async () => ({ success: true }) },
+    buildFulfillmentPlan: () => [], auditSink: () => {},
+    createBackup: async () => { backedUp = true; }
+  }), /discord.roles.staff/);
+  assert.equal(backedUp, false);
+  assert.deepEqual(db.calls, []);
+});
+
 test('composition checks integrity, backs up, migrates, and constructs narrow services',async()=>{
   const db=fakeDatabase(); const order=[];
   const runtime=await composeRuntime({
@@ -55,7 +76,7 @@ test('composition checks integrity, backs up, migrates, and constructs narrow se
     randomUUID:()=> '00000000-0000-4000-8000-000000000001',
     createBackup:async()=>{order.push('backup');return {sha256:'safe'};}, env:{PIN_PROTECTION_KEY:Buffer.alloc(32,7).toString('base64')}
   });
-  assert.equal(runtime.schemaVersion,8);
+  assert.equal(runtime.schemaVersion,10);
   assert.equal(runtime.backup.sha256,'safe');
   assert.equal(order[0],'backup');
   assert(runtime.fulfillment);
@@ -86,6 +107,7 @@ test('Discord receives narrow services and environment without database or trans
       'audit',
       'authorization',
       'catalogManager',
+      'dashboardPanels',
       'dashboards',
       'fulfillment',
       'interactionGuard',

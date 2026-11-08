@@ -8,7 +8,7 @@ function createFulfillmentService({
   authorization,
   interactionGuard,
   repository,
-  creatures,
+  catalogManager,
   ark,
   onlinePlayers,
   audit,
@@ -19,7 +19,10 @@ function createFulfillmentService({
     ['authorization', authorization, 'authorize'],
     ['interactionGuard', interactionGuard, 'consume'],
     ['repository', repository, 'create'],
-    ['creatures', creatures, 'get'],
+    ['repository', repository, 'get'],
+    ['repository', repository, 'cancel'],
+    ['repository', repository, 'updateResults'],
+    ['catalogManager', catalogManager, 'current'],
     ['ark', ark, 'fulfillApprovedCreature'],
     ['onlinePlayers', onlinePlayers, 'revalidate'],
     ['audit', audit, 'write']
@@ -36,6 +39,7 @@ function createFulfillmentService({
   return Object.freeze({
     async createPending(input) {
       authorize(input.context);
+      const creatures = catalogManager.current();
       const creature = creatures.get(input.creatureId);
       requireIdentifier('serverId', input.serverId);
       requireIdentifier('eosId', input.eosId);
@@ -73,10 +77,17 @@ function createFulfillmentService({
       if (!session?.requestId) {
         throw new Error('The confirmation session is missing its request binding.');
       }
-      const claimed = await repository.claim(session.requestId, input.context.actorId, clock());
-      if (claimed.catalogVersion !== creatures.version) {
+      const creatures = catalogManager.current();
+      const pending = await repository.get(session.requestId);
+      if (!pending || pending.actorId !== input.context.actorId) {
+        throw new Error('Fulfillment request cannot be claimed.');
+      }
+      if (pending.catalogVersion !== creatures.version) {
+        const expired = await repository.update(pending.id, STATES.EXPIRED, { completedAt: clock() });
+        audit.write('fulfillment.expired', { requestId: expired.id, reason: 'CATALOG_VERSION_CHANGED' });
         throw new Error('Catalog version changed before fulfillment.');
       }
+      const claimed = await repository.claim(session.requestId, input.context.actorId, clock());
 
       const availability = await onlinePlayers.revalidate({
         playerRef: claimed.playerRef,
@@ -94,11 +105,16 @@ function createFulfillmentService({
 
       await repository.update(claimed.id, STATES.EXECUTING);
       try {
+        const operationResults = [];
         const results = await ark.fulfillApprovedCreature({
           requestId: claimed.id,
           serverId: claimed.serverId,
           creature: creatures.get(claimed.creatureId),
-          eosId: claimed.eosId
+          eosId: claimed.eosId,
+          onResult: async result => {
+            operationResults.push(result);
+            await repository.updateResults(claimed.id, operationResults);
+          }
         });
         if (!Array.isArray(results) || results.length === 0) {
           throw new Error('Fulfillment returned no operation results.');
@@ -117,10 +133,28 @@ function createFulfillmentService({
         audit.write('fulfillment.completed', done);
         return done;
       } catch (error) {
-        await repository.update(claimed.id, STATES.UNCERTAIN, { completedAt: clock() });
+        const current = await repository.get(claimed.id);
+        await repository.update(claimed.id, STATES.UNCERTAIN, {
+          completedAt: clock(),
+          results: current?.results
+        });
         audit.write('fulfillment.uncertain', { requestId: claimed.id, error });
         throw error;
       }
+    },
+
+    async cancel(input) {
+      authorize(input.context);
+      const session = await interactionGuard.consume(input.token, {
+        ...input.context,
+        action: 'fulfillment.confirm'
+      });
+      if (!session?.requestId) {
+        throw new Error('The confirmation session is missing its request binding.');
+      }
+      const canceled = await repository.cancel(session.requestId, input.context.actorId, clock());
+      audit.write('fulfillment.canceled', { requestId: canceled.id, state: canceled.state });
+      return canceled;
     }
   });
 }

@@ -11,6 +11,7 @@ const ALLOWED_TYPES = Object.freeze([
   'pin.canceled',
   'fulfillment.succeeded',
   'fulfillment.failed',
+  'fulfillment.canceled',
   'catalog.activated',
   'catalog.rolled-back'
 ]);

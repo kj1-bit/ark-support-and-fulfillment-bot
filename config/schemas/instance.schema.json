@@ -117,13 +117,14 @@
     "features": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tickets", "pins", "playerNames", "shop", "fulfillment"],
+      "required": ["tickets", "pins", "playerNames", "shop", "fulfillment", "dashboards"],
       "properties": {
         "tickets": { "type": "boolean" },
         "pins": { "type": "boolean" },
         "playerNames": { "type": "boolean" },
         "shop": { "type": "boolean" },
-        "fulfillment": { "type": "boolean" }
+        "fulfillment": { "type": "boolean" },
+        "dashboards": { "type": "boolean" }
       }
     }
   }

@@ -12,7 +12,7 @@ function config(mode = 'mock') {
     discord: { clientId: '10000000000000001', guildId: '10000000000000002', tokenSecret: 'DISCORD_TOKEN', roles: {}, channels: {} },
     ark: { timeoutMs: 10000, servers: [] },
     storage: { databasePath: './runtime/test.sqlite', backupPath: './runtime/backups' },
-    features: { tickets: false, pins: false, playerNames: false, shop: false, fulfillment: false }
+    features: { tickets: false, pins: false, playerNames: false, shop: false, fulfillment: false, dashboards: false }
   });
 }
 

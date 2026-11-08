@@ -52,6 +52,7 @@
     "pins": true,
     "playerNames": true,
     "shop": true,
-    "fulfillment": true
+    "fulfillment": true,
+    "dashboards": true
   }
 }

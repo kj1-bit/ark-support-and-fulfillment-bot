@@ -21,6 +21,7 @@ test('server registry rejects duplicate IDs even when one entry is disabled',()=
 });
 test('catalog changes are reviewable and versioned',()=>{const a=createCreatureRegistry(catalog('2026.1.0'));const b=createCreatureRegistry({version:'2026.2.0',creatures:[{...creature,name:'Rex Prime'}]});assert.deepEqual(diffCatalogs(a,b),{added:[],removed:[],changed:['rex']});assert.notEqual(a.checksum,b.checksum);});
 test('RCON service accepts named operations and keeps raw transport private',async()=>{const calls=[];const servers=createServerRegistry([{id:'map-one',name:'Map',enabled:true,operations:['fulfillApprovedCreature']}]);const service=createArkOperationService({serverRegistry:servers,transport:{execute:async x=>{calls.push(x);return {success:true};}},buildFulfillmentPlan:()=>[{command:'internal'}]});await service.fulfillApprovedCreature({serverId:'map-one'});assert.equal(calls[0].type,'fulfillApprovedCreature');assert.throws(()=>servers.get('map-one','listOnlinePlayers'),/not allowed/);});
+test('RCON fulfillment reports each normalized operation result before continuing',async()=>{const observed=[];let calls=0;const servers=createServerRegistry([{id:'map-one',name:'Map',enabled:true,operations:['fulfillApprovedCreature']}]);const service=createArkOperationService({serverRegistry:servers,transport:{execute:async()=>{calls++;if(calls===2)throw new Error('timeout');return {success:true,code:'SPAWN_OK',response:'do not persist me'};}},buildFulfillmentPlan:()=>[{command:'first'},{command:'second'}]});await assert.rejects(()=>service.fulfillApprovedCreature({serverId:'map-one',onResult:async result=>observed.push(result)}),/timeout/);assert.deepEqual(observed,[{operationIndex:1,success:true}]);assert(!JSON.stringify(observed).includes('persist me'));});
 test('repository atomically rejects duplicate request and second claim',()=>{const repo=createInMemoryFulfillmentRepository();repo.create({id:'a',idempotencyKey:'key',actorId:'actor',state:STATES.PENDING,expiresAt:100});assert.throws(()=>repo.create({id:'b',idempotencyKey:'key',state:STATES.PENDING}),/Duplicate/);repo.claim('a','actor',50);assert.throws(()=>repo.claim('a','actor',50),/Invalid fulfillment transition/);});
 test('audit logger redacts sensitive fields and EOS IDs',()=>{const out=[];createAuditLogger({sink:x=>out.push(x),clock:()=>0}).write('x',{password:'secret',eosId:'0123456789abcdef0123456789abcdef'});const text=JSON.stringify(out);assert(!text.includes('secret'));assert(!text.includes('0123456789abcdef0123456789abcdef'));});
 test('empty fulfillment results fail closed without reporting success',async()=>{
@@ -41,10 +42,7 @@ test('empty fulfillment results fail closed without reporting success',async()=>
       consume:()=>Object.freeze({used:true,requestId:'FUL-00000000-0000-4000-8000-000000000001'})
     },
     repository,
-    creatures:{
-      version:'2026.1.0',
-      get:()=>creature
-    },
+    catalogManager:{current:()=>({version:'2026.1.0',get:()=>creature})},
     ark:{
       fulfillApprovedCreature:async()=>[]
     },
@@ -54,6 +52,12 @@ test('empty fulfillment results fail closed without reporting success',async()=>
     },
     clock:()=>50,
     uuid:()=>'00000000-0000-4000-8000-000000000001'
+  });
+
+  test('in-memory claim rejects a request at its expiration boundary',()=>{
+    const repo=createInMemoryFulfillmentRepository();
+    repo.create({id:'expires-now',idempotencyKey:'expires-now',actorId:'actor',state:STATES.PENDING,expiresAt:50});
+    assert.throws(()=>repo.claim('expires-now','actor',50),/expired/);
   });
 
   const pending=await service.createPending({

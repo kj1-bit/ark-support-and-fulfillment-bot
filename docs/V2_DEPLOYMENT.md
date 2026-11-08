@@ -48,6 +48,12 @@ Removing `/updatebot` intentionally removes one V1 administrative workflow. All 
 
 Existing installations must remove `UPDATE_SCRIPT_PATH` from private environment files and rerun `node deploy-commands.js` during a reviewed deployment so Discord's global command registration no longer includes `/updatebot`.
 
-Run `node scripts/deploy-v2-commands.js` during the reviewed deployment with `DISCORD_TOKEN`, `CLIENT_ID`, and a valid V2 runtime configuration available. The script deploys commands for enabled V2 features, replaces only its managed command names, and preserves other registered global commands.
+Run `node scripts/deploy-v2-commands.js` for a dry run with `DISCORD_TOKEN` and a valid V2 runtime configuration. Review the printed add/update/remove diff, then apply it with `node scripts/deploy-v2-commands.js --apply`. The application ID comes from validated `discord.clientId`, not a separate environment variable. The script changes only commands it owns and preserves unrelated global commands. Before applying, it re-reads the command list and aborts if the list changed during review; Discord does not provide an atomic compare-and-swap for command edits, so keep deployment changes serialized.
+
+V2 PIN requests can be approved and then delivered with `/pin deliver request-id:<reference>`. Delivery sends the protected PIN only by direct message to the request owner; a failed DM leaves the request approved so staff can retry after resolving the recipient's DM settings.
+
+When `features.dashboards` is enabled, `staff`, `ticketLogs`, `pinsDashboard`, and `fulfillmentLogs` are required. The runtime persists each log-panel message ID in schema version 9, restores or edits the panel after the Discord client becomes ready, and recreates it after a message-delete event. All three panels use the same authorized, paginated response layout.
+
+Schema version 10 redacts legacy fulfillment operation results during migration. The runtime now stores only a bounded operation index and success flag; raw transport output and command details are excluded.
 
 The V2 runtime migration keeps the legacy V1 ticket table intact by renaming it to `tickets_v1_legacy` before creating the V2 `tickets` table; if that archive name is already occupied, migration fails and rolls back without changing ticket data. Keep the pre-migration backup until the updated runtime and historical ticket data have been verified. A rollback to V1 must restore that backup before starting V1 because its handlers expect the original `tickets` table shape.

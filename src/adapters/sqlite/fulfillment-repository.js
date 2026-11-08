@@ -26,6 +26,22 @@ function parse(row) {
   });
 }
 
+function safeResults(results) {
+  if (!Array.isArray(results) || results.length > 20) {
+    throw new TypeError('Fulfillment results must contain at most 20 operations.');
+  }
+  return results.map(result => {
+    if (!result || typeof result.success !== 'boolean') {
+      throw new TypeError('Fulfillment operation result must include a success boolean.');
+    }
+    const safe = { success: result.success };
+    if (Number.isInteger(result.operationIndex) && result.operationIndex >= 1 && result.operationIndex <= 20) {
+      safe.operationIndex = result.operationIndex;
+    }
+    return safe;
+  });
+}
+
 function createSqliteFulfillmentRepository(database) {
   if (!database || typeof database.run !== 'function' || typeof database.get !== 'function') {
     throw new TypeError('database run/get interface is required.');
@@ -58,7 +74,7 @@ function createSqliteFulfillmentRepository(database) {
       const result = await database.run(
         `UPDATE fulfillment_requests
          SET state = 'CLAIMED', claimed_at = ?
-         WHERE id = ? AND actor_id = ? AND state = 'PENDING' AND expires_at >= ?`,
+         WHERE id = ? AND actor_id = ? AND state = 'PENDING' AND expires_at > ?`,
         [now, id, actorId, now]
       );
       if (result.changes !== 1) throw new Error('Fulfillment request cannot be claimed.');
@@ -69,7 +85,7 @@ function createSqliteFulfillmentRepository(database) {
       const current = await repository.get(id);
       if (!current) throw new Error('Fulfillment request not found.');
       transition(current.state, nextState);
-      const resultJson = patch.results === undefined ? null : JSON.stringify(patch.results);
+      const resultJson = patch.results === undefined ? null : JSON.stringify(safeResults(patch.results));
       const result = await database.run(
         `UPDATE fulfillment_requests
          SET state = ?, completed_at = COALESCE(?, completed_at),
@@ -81,10 +97,34 @@ function createSqliteFulfillmentRepository(database) {
         throw new Error('Fulfillment request changed before the update completed.');
       }
       return repository.get(id);
+    },
+
+    async cancel(id, actorId, now) {
+      const result = await database.run(
+        `UPDATE fulfillment_requests
+         SET state = 'CANCELED', completed_at = ?
+         WHERE id = ? AND actor_id = ? AND state = 'PENDING' AND expires_at > ?`,
+        [now, id, actorId, now]
+      );
+      if (result.changes !== 1) throw new Error('Fulfillment request cannot be canceled.');
+      return repository.get(id);
+    },
+
+    async updateResults(id, results) {
+      const resultJson = JSON.stringify(safeResults(results));
+      const result = await database.run(
+        `UPDATE fulfillment_requests SET result_json = ?
+         WHERE id = ? AND state = 'EXECUTING'`,
+        [resultJson, id]
+      );
+      if (result.changes !== 1) {
+        throw new Error('Fulfillment results can only be recorded while executing.');
+      }
+      return repository.get(id);
     }
   };
 
   return Object.freeze(repository);
 }
 
-module.exports = { createSqliteFulfillmentRepository, parse };
+module.exports = { createSqliteFulfillmentRepository, parse, safeResults };

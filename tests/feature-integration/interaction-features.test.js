@@ -32,12 +32,17 @@ function makeInteraction(commandName, subcommand, values = {}) {
 
 function makeAdapter(overrides = {}) {
   const listeners = [];
-  const calls = { ticket: null, pin: null, playerName: null, logs: [] };
+  const calls = { ticket: null, pin: null, pinMessage: null, playerName: null, logs: [] };
   const client = {
     on: (event, listener) => { if (event === 'interactionCreate') listeners.push(listener); },
     off: () => {},
     login: async () => {},
-    destroy: async () => {}
+    destroy: async () => {},
+    users: {
+      fetch: async id => ({
+        send: async content => { calls.pinMessage = { id, content }; }
+      })
+    }
   };
   const services = {
     playerNames: {
@@ -53,6 +58,10 @@ function makeAdapter(overrides = {}) {
     pins: {
       request: async input => { calls.pin = input; return { id: 'pin', state: 'PENDING' }; },
       approve: async () => ({ id: 'pin', state: 'APPROVED' }),
+      deliver: async input => {
+        await input.deliver('0123', { actorId: identity.id });
+        return { id: 'pin', state: 'DELIVERED' };
+      },
       cancel: async () => ({ id: 'pin', state: 'CANCELED' })
     },
     shop: { search: async () => ({ items: [] }) },
@@ -116,6 +125,34 @@ test('PIN and player-name submissions have reachable private modal flows', async
   };
   await dispatch(listeners, nameModalInteraction);
   assert.deepEqual(calls.playerName, { discordId: identity.id, playerName: 'Survivor' });
+  await adapter.stop();
+});
+
+test('approved PIN delivery privately messages the request owner without exposing the PIN in the interaction reply', async () => {
+  const { adapter, listeners, calls } = makeAdapter();
+  await adapter.start();
+  const interaction = makeInteraction('pin', 'deliver', { 'request-id': 'PIN-1' });
+  interaction.deferred = true;
+  interaction.editReply = async payload => interaction.replies.push(payload);
+  await dispatch(listeners, interaction);
+  assert.deepEqual(calls.pinMessage, {
+    id: identity.id,
+    content: 'Your approved vault PIN is **0123**. Do not share it.'
+  });
+  assert(!JSON.stringify(interaction.replies).includes('0123'));
+  await adapter.stop();
+});
+
+test('shop search renders the service results and nested DLC warning', async () => {
+  const { adapter, listeners } = makeAdapter({
+    shop: { search: async () => ({ results: [{ name: 'Rex', dlc: { warning: 'Requires access to Genesis.' } }] }) }
+  });
+  await adapter.start();
+  const interaction = makeInteraction('shop-search', null, { query: 'rex', page: 1 });
+  interaction.deferReply = async () => { interaction.deferred = true; };
+  interaction.editReply = async payload => interaction.replies.push(payload);
+  await dispatch(listeners, interaction);
+  assert.match(interaction.replies[0].content, /Rex - Requires access to Genesis/);
   await adapter.stop();
 });
 

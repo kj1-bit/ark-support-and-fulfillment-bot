@@ -151,10 +151,10 @@ Exit criteria:
 - [x] Remove Discord-triggered shell execution.
 - [x] Remove or replace `/updatebot`.
 - [x] Audit all uses of process execution and dynamic command construction.
-- [ ] Restrict RCON to allowlisted operations.
-- [ ] Separate command creation from command transport.
-- [ ] Make raw RCON transport inaccessible to Discord feature handlers.
-- [ ] Add injection and authorization tests.
+- [x] Restrict RCON to allowlisted operations.
+- [x] Separate command creation from command transport.
+- [x] Make raw RCON transport inaccessible to Discord feature handlers.
+- [x] Add injection and authorization tests.
 - [x] Document the secure deployment update process.
 
 Exit criteria:
@@ -166,13 +166,13 @@ Exit criteria:
 
 ## Phase 4: Central authorization and validation
 
-- [ ] Centralize role, capability, and permission checks.
-- [ ] Centralize Discord interaction validation.
-- [ ] Define authorization policies by feature and operation.
-- [ ] Normalize and validate player, server, creature, catalog, and request identifiers.
-- [ ] Prevent stale, replayed, cross-user, cross-channel, or duplicate interactions.
-- [ ] Recheck authorization immediately before privileged execution.
-- [ ] Add authorization and negative-path tests.
+- [x] Centralize role, capability, and permission checks.
+- [x] Centralize Discord interaction validation.
+- [x] Define authorization policies by feature and operation.
+- [x] Normalize and validate player, server, creature, catalog, and request identifiers.
+- [x] Prevent stale, replayed, cross-user, cross-channel, or duplicate interactions.
+- [x] Recheck authorization immediately before privileged execution.
+- [x] Add authorization and negative-path tests.
 
 Exit criteria:
 
@@ -184,42 +184,42 @@ Exit criteria:
 
 ### Player registry
 
-- [ ] Create a trusted player registry.
-- [ ] Separate typed display names from trusted internal identity.
-- [ ] Link Discord identity, observed ARK identity, and EOS identity through verified records.
-- [ ] Migrate legacy self-entered names as unverified records.
+- [x] Create a trusted player registry.
+- [x] Separate typed display names from trusted internal identity.
+- [x] Link Discord identity, observed ARK identity, and EOS identity through verified records.
+- [x] Migrate legacy self-entered names as unverified records.
 
 ### Server registry
 
-- [ ] Create a trusted server and map registry.
-- [ ] Require unique server IDs and validated host, port, secret reference, environment, and test-only state.
-- [ ] Define the allowlisted operations supported by each server.
+- [x] Create a trusted server and map registry.
+- [x] Require unique server IDs and validated host, port, secret reference, environment, and test-only state.
+- [x] Define the allowlisted operations supported by each server.
 
 ### Creature spawning catalog
 
-- [ ] Store the creature spawning catalog as independently updatable, versioned data rather than hardcoded feature logic.
-- [ ] Keep catalog loading, validation, activation, and rollback separate from Discord presentation and RCON transport.
-- [ ] Define a documented catalog schema and update workflow.
-- [ ] Require stable creature IDs, display names, aliases, blueprints, enabled state, tameable state, gender behavior, delivery mode, saddle applicability, source content, DLC metadata, and catalog-version metadata.
-- [ ] Validate the complete proposed catalog before activating any update.
-- [ ] Reject duplicate creature IDs, unsafe blueprint paths, unsupported delivery modes, contradictory gender settings, and incomplete required metadata.
-- [ ] Generate a reviewable summary of additions, removals, and changed fields before activation.
-- [ ] Back up or retain the current known-good catalog before activating a replacement.
-- [ ] Activate validated catalog updates atomically so the runtime cannot observe a partially updated registry.
-- [ ] Leave the active known-good catalog unchanged when validation or activation fails.
-- [ ] Record the active catalog version in fulfillment requests, results, and audit records.
-- [ ] Support documented rollback to the previous known-good catalog.
-- [ ] Define whether safe catalog reloads require a process restart or may use an authorized reload operation.
-- [ ] If runtime reload is supported, ensure it performs validation and atomic replacement without exposing raw file paths or shell execution through Discord.
-- [ ] Add tests for DLC, gendered, genderless, saddled, unsaddled, disabled, unsupported, malformed, duplicate, added, modified, and removed entries.
+- [x] Store the creature spawning catalog as independently updatable, versioned data rather than hardcoded feature logic.
+- [x] Keep catalog loading, validation, activation, and rollback separate from Discord presentation and RCON transport.
+- [x] Define a documented catalog schema and update workflow.
+- [x] Require stable creature IDs, display names, aliases, blueprints, enabled state, tameable state, gender behavior, delivery mode, saddle applicability, source content, DLC metadata, and catalog-version metadata.
+- [x] Validate the complete proposed catalog before activating any update.
+- [x] Reject duplicate creature IDs, unsafe blueprint paths, unsupported delivery modes, contradictory gender settings, and incomplete required metadata.
+- [x] Generate a reviewable summary of additions, removals, and changed fields before activation.
+- [x] Back up or retain the current known-good catalog before activating a replacement.
+- [x] Activate validated catalog updates atomically so the runtime cannot observe a partially updated registry.
+- [x] Leave the active known-good catalog unchanged when validation or activation fails.
+- [x] Record the active catalog version in fulfillment requests, results, and audit records.
+- [x] Support documented rollback to the previous known-good catalog.
+- [x] Define whether safe catalog reloads require a process restart or may use an authorized reload operation.
+- [x] If runtime reload is supported, ensure it performs validation and atomic replacement without exposing raw file paths or shell execution through Discord.
+- [x] Add tests for DLC, gendered, genderless, saddled, unsaddled, disabled, unsupported, malformed, duplicate, added, modified, and removed entries.
 - [ ] Test new or changed blueprints on the approved test server before production use.
 
 ### Registry-wide work
 
-- [ ] Define versioned data formats.
-- [ ] Validate all registry data during startup.
-- [ ] Add migration and compatibility tests.
-- [ ] Document registry ownership, update permissions, review requirements, and rollback procedures.
+- [x] Define versioned data formats.
+- [x] Validate all registry data during startup.
+- [x] Add migration and compatibility tests.
+- [x] Document registry ownership, update permissions, review requirements, and rollback procedures.
 
 Exit criteria:
 
@@ -233,19 +233,19 @@ Exit criteria:
 
 ## Phase 6: Secure interaction and fulfillment workflow
 
-- [ ] Use versioned, opaque, server-side interaction tokens.
-- [ ] Bind interactions to actor, guild, channel, message, action, request, expiration, and state.
-- [ ] Add request expiration.
-- [ ] Create persistent fulfillment requests before confirmation.
-- [ ] Atomically claim a pending request before RCON execution.
-- [ ] Add idempotency protection.
-- [ ] Require explicit fulfillment confirmation.
-- [ ] Revalidate authorization, player availability, server, creature ID, and catalog version immediately before execution.
-- [ ] Mask EOS IDs in Discord logs.
-- [ ] Preserve the confirmed AAT fulfillment contract.
-- [ ] Clearly display scanning delays and DLC restrictions.
-- [ ] Treat timeout and lost-response cases as uncertain outcomes rather than automatic retry conditions.
-- [ ] Add mock, failure, partial-delivery, retry, replay, restart, and duplicate-request tests.
+- [x] Use versioned, opaque, server-side interaction tokens.
+- [x] Bind interactions to actor, guild, channel, message, action, request, expiration, and state.
+- [x] Add request expiration.
+- [x] Create persistent fulfillment requests before confirmation.
+- [x] Atomically claim a pending request before RCON execution.
+- [x] Add idempotency protection.
+- [x] Require explicit fulfillment confirmation.
+- [x] Revalidate authorization, player availability, server, creature ID, and catalog version immediately before execution.
+- [x] Mask EOS IDs in Discord logs.
+- [x] Preserve the confirmed AAT fulfillment contract.
+- [x] Clearly display scanning delays and DLC restrictions.
+- [x] Treat timeout and lost-response cases as uncertain outcomes rather than automatic retry conditions.
+- [x] Add mock, failure, partial-delivery, retry, replay, restart, and duplicate-request tests.
 
 Exit criteria:
 
@@ -256,15 +256,15 @@ Exit criteria:
 
 ## Phase 7: Database migrations and recovery
 
-- [ ] Introduce a schema-version table.
-- [ ] Add ordered, transactional migrations.
-- [ ] Back up the database before migration.
-- [ ] Validate database integrity before and after migration.
-- [ ] Test restoration using a copied database.
+- [x] Introduce a schema-version table.
+- [x] Add ordered, transactional migrations.
+- [x] Back up the database before migration.
+- [x] Validate database integrity before and after migration.
+- [x] Test restoration using a copied database.
 - [ ] Define retention and privacy rules.
-- [ ] Add persistent fulfillment request and operation-result records.
-- [ ] Add catalog-version references to fulfillment audit data.
-- [ ] Document recovery and rollback procedures.
+- [x] Add persistent fulfillment request and operation-result records.
+- [x] Add catalog-version references to fulfillment audit data.
+- [x] Document recovery and rollback procedures.
 
 Exit criteria:
 
@@ -275,15 +275,15 @@ Exit criteria:
 
 ## Phase 8: Logging and operational visibility
 
-- [ ] Centralize structured application logging.
-- [ ] Redact tokens, passwords, PINs, full EOS IDs, and sensitive output.
+- [x] Centralize structured application logging.
+- [x] Redact tokens, passwords, PINs, full EOS IDs, and sensitive output.
 - [ ] Add correlation and request IDs.
-- [ ] Unify ticket and fulfillment audit conventions.
-- [ ] Record catalog version and operation state in fulfillment audit events.
+- [x] Unify ticket and fulfillment audit conventions.
+- [x] Record catalog version and operation state in fulfillment audit events.
 - [ ] Record catalog activation, rejection, and rollback events without logging sensitive data.
-- [ ] Build resilient paginated dashboards.
-- [ ] Restore dashboards after restart or message deletion.
-- [ ] Document operator diagnostics.
+- [x] Build resilient paginated dashboards.
+- [x] Restore dashboards after restart or message deletion.
+- [x] Document operator diagnostics.
 
 Exit criteria:
 
@@ -293,13 +293,13 @@ Exit criteria:
 
 ## Phase 9: Feature contracts and modularization
 
-- [ ] Define feature manifests.
-- [ ] Define feature flags and dependencies.
-- [ ] Establish stable service interfaces.
-- [ ] Move feature code out of the monolithic entry point.
-- [ ] Support independently testable modules.
-- [ ] Give features predictable initialize, register, start, and stop lifecycles.
-- [ ] Ensure disabled features register no commands, panels, timers, or network activity.
+- [x] Define feature manifests.
+- [x] Define feature flags and dependencies.
+- [x] Establish stable service interfaces.
+- [x] Move feature code out of the monolithic entry point.
+- [x] Support independently testable modules.
+- [x] Give features predictable initialize, register, start, and stop lifecycles.
+- [x] Ensure disabled features register no commands, panels, timers, or network activity.
 - [ ] Document extension and contribution patterns.
 
 Exit criteria:
@@ -395,6 +395,32 @@ A creature catalog update is acceptable only when:
 - Catalog updates cannot submit arbitrary RCON commands or bypass the allowlisted operation builder.
 
 ## Current checkpoint
+
+- Date: 2026-11-07
+- PR: [#17](https://github.com/kj1-bit/ark-support-and-fulfillment-bot/pull/17), head branch `integration/v2-complete-runtime`
+- Milestone: V2 runtime review remediation
+- Database schema version: 10
+- Status: Addressing confirmed fulfillment, PIN, shop, dashboard, configuration, deployment, and project-governance findings. Production has not been deployed and the PR has not been merged.
+
+### Current implementation
+
+- Fulfillment reads the active catalog at request creation and confirmation; stale catalog requests expire before claim.
+- Confirmation cancellation consumes the same one-time session as confirmation and transitions the persistent request to `CANCELED`.
+- Each normalized RCON operation result is saved as it completes. Persisted summaries are limited to success and operation index; raw transport responses, commands, server details, and sensitive identifiers are not stored. Schema version 10 also redacts historical raw result data.
+- PIN cancellation derives ownership from the persisted request. Staff can deliver an approved PIN only by direct message to its owner.
+- Shop search renders the catalog service's `results` and nested DLC warning contract.
+- Ticket, PIN, and fulfillment audit panels use the same authorized paginated interface and are persisted/restored after restart or message deletion.
+- Enabled features require their staff roles and channels before backup or migrations begin.
+- Slash-command deployment defaults to a reviewed dry run, uses the validated Discord application ID, updates only managed commands, and aborts when the command list changes during review.
+
+### Verification
+
+- Full automated suite: 162 tests passed, 0 failed.
+- Public example configuration validation: passed.
+- `git diff --check`: passed.
+- This checkpoint is prepared for the existing PR #17 head branch; it does not merge or deploy the runtime.
+
+## Historical checkpoint (2026-11-05)
 
 - Date: 2026-11-05
 - Branch: `feature/v2-authorization-foundation`

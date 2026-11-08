@@ -1,6 +1,8 @@
 # Ticketbot V2 bootstrap integration
 
-This checkpoint completes the startup-order portion of GitHub issue #2 without modifying the V1 `index.js` entry point.
+> **Historical implementation checkpoint.** This page records the original dependency-injected bootstrap work, not the current V2 executable or a runnable Debian procedure. The current coordinator is `src/composition/start-v2.js`; it is still a function that requires injected adapters, not a command-line entrypoint. See the [V2 guide](V2_GUIDE.md) and [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for current status.
+
+This checkpoint completed the startup-order portion of GitHub issue #2 without modifying the V1 `index.js` entry point.
 
 ## Guaranteed order
 
@@ -26,8 +28,8 @@ The bootstrap accepts adapter factories so startup ordering can be tested withou
 
 ## Compatibility and private configuration
 
-This checkpoint does not change V1 configuration consumption. A later migration will explicitly select the V2 bootstrap and supply private runtime configuration. Until then, the current V1 entry point remains the production path.
+At the time this checkpoint was written, V1 was the production path. The current root `index.js` remains the V1 entrypoint. `src/bootstrap/start-application.js` is the V1 bootstrap and is not the V2 coordinator.
 
 ## Rollback
 
-Restore the branch to commit `e4fb907` or remove `src/bootstrap/start-application.js`, `tests/bootstrap/start-application.test.js`, and this document, then restore the roadmap and package scripts after reviewing the diff. No Discord, RCON, database, or service rollback is required.
+The commit-specific rollback instructions above are historical and are not a current deployment procedure. Use the reviewed [V2 rollback plan](V2_ROLLBACK.md) for current source and data recovery guidance.

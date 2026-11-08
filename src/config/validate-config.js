@@ -75,7 +75,7 @@ function validateConfig(input, options={}) {
     addUnknown(storage,new Set(['databasePath','backupPath']),'configuration.storage',issues);
     for (const key of ['databasePath','backupPath']) {
       const value=reqString(storage,key,'configuration.storage',issues);
-      if (value&&runtime?.mode==='production') { const resolved=path.resolve(value); if (resolved===sourceRoot||resolved.startsWith(sourceRoot+path.sep)) issues.push(`configuration.storage.${key}: production path must be outside source repository`); }
+      if (value&&runtime?.mode==='production') { const resolved=path.resolve(sourceRoot,value); if (resolved===sourceRoot||resolved.startsWith(sourceRoot+path.sep)) issues.push(`configuration.storage.${key}: production path must be outside source repository`); }
     }
   }
   const features=input.features;

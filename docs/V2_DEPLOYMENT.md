@@ -40,15 +40,13 @@ Rollback is also operator-controlled and must not depend on Discord.
 6. Start the service and verify expected behavior.
 7. Record the rollback result.
 
-For this source-only checkpoint, restoring commit `21de487` returns the repository to the state before removal of the Discord shell path. No production service, Discord registration, database, or RCON state is changed merely by merging this source checkpoint.
+Before any V2 test or production deployment, record the exact deployed commit and a verified database/configuration backup as the rollback point. Restore that commit and its matching configuration through the host's approved service workflow. If a database was migrated from V1, restore the pre-migration backup before starting V1; the V2 migration archives the V1 `tickets` table and does not convert it to the V2 schema.
 
 ## Compatibility and migration
 
-Removing `/updatebot` intentionally removes one V1 administrative workflow. All player, ticket, PIN, shop, panel, fulfillment, database, mock-mode, and RCON behaviors remain otherwise unchanged by this checkpoint.
+The root `index.js` and `deploy-commands.js` remain the V1 entrypoints. V2 has a separate validated JSON configuration, composition layer, repositories, and Discord features; merging V2 source does not switch the root application to V2 or change the V1 service. The V2 executable is `scripts/start-v2.js`; it is separate from the root V1 launcher. A test deployment remains unverified until the isolated Debian acceptance checklist passes.
 
-Existing installations must remove `UPDATE_SCRIPT_PATH` from private environment files and rerun `node deploy-commands.js` during a reviewed deployment so Discord's global command registration no longer includes `/updatebot`.
-
-Run `node scripts/deploy-v2-commands.js` for a dry run with `DISCORD_TOKEN` and a valid V2 runtime configuration. Review the printed add/update/remove diff, then apply it with `node scripts/deploy-v2-commands.js --apply`. The application ID comes from validated `discord.clientId`, not a separate environment variable. The script changes only commands it owns and preserves unrelated global commands. Before applying, it re-reads the command list and aborts if the list changed during review; Discord does not provide an atomic compare-and-swap for command edits, so keep deployment changes serialized.
+The V2 command-registration script changes global Discord commands and is a separate operator action. It defaults to a dry run; `--apply` is a real external change and must be reviewed against the intended application. The app ID comes from validated `discord.clientId`; the script preserves unmanaged commands and checks for a concurrent command-list change, but cannot provide an atomic compare-and-swap. See the [V2 guide](V2_GUIDE.md#discord-command-registration-is-a-separate-action). Do not apply it to a production application during isolated testing.
 
 V2 PIN requests can be approved and then delivered with `/pin deliver request-id:<reference>`. Delivery sends the protected PIN only by direct message to the request owner; a failed DM leaves the request approved so staff can retry after resolving the recipient's DM settings.
 
@@ -58,4 +56,6 @@ Schema version 10 redacts legacy fulfillment operation results during migration.
 
 Retention and cleanup are configured with the optional `retention` section and described in `docs/V2_RETENTION.md`. The runtime also reconciles interrupted fulfillment requests (`CLAIMED` to `FAILED`, `EXECUTING` to `UNCERTAIN`) before Discord connects, so a restart after a crash leaves no request stuck mid-flow.
 
-The V2 runtime migration keeps the legacy V1 ticket table intact by renaming it to `tickets_v1_legacy` before creating the V2 `tickets` table; if that archive name is already occupied, migration fails and rolls back without changing ticket data. Keep the pre-migration backup until the updated runtime and historical ticket data have been verified. A rollback to V1 must restore that backup before starting V1 because its handlers expect the original `tickets` table shape.
+The V2 runtime migration keeps the legacy V1 ticket table intact by renaming it to `tickets_v1_legacy` before creating the V2 `tickets` table; if that archive name is already occupied, migration fails and rolls back without changing ticket data. This preserves legacy ticket data but does not make V1 able to use the migrated database. Keep the pre-migration backup until the updated runtime and historical ticket data have been verified. A rollback to V1 must restore that backup before starting V1 because its handlers expect the original `tickets` table shape.
+
+The standalone V2 entrypoint is `node scripts/start-v2.js` or `npm run start:v2`. It reads `TICKETBOT_CONFIG_PATH` (or the default ignored local config), and starts the composed SQLite/Discord/RCON runtime. See the [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for an isolated test service example. The launcher has mock-mode startup coverage; it has not been rehearsed on Debian or against external test endpoints. Do not treat it as production-accepted.

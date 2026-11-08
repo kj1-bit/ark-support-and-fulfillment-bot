@@ -397,10 +397,11 @@ A creature catalog update is acceptable only when:
 ## Current checkpoint
 
 - Date: 2026-11-07
-- PR: [#17](https://github.com/kj1-bit/ark-support-and-fulfillment-bot/pull/17), head branch `integration/v2-complete-runtime`
+- PR: [#17](https://github.com/kj1-bit/ark-support-and-fulfillment-bot/pull/17), merged to `main` as `a7412ef536ca45d4ef52c3264e8d41d5199c7179`
+- V2 test baseline tag: `v2-test-baseline-2026-11-07`
 - Milestone: V2 runtime review remediation
 - Database schema version: 10
-- Status: Addressing confirmed fulfillment, PIN, shop, dashboard, configuration, deployment, and project-governance findings. Production has not been deployed and the PR has not been merged.
+- Status: PR #17 is merged. V2 now has a standalone launcher at `scripts/start-v2.js`; Debian and external test-endpoint rehearsal remain outstanding. The root `index.js` remains the V1 entrypoint. See the [V2 guide](V2_GUIDE.md) and [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for current operator guidance and test acceptance steps.
 
 ### Current implementation
 
@@ -414,13 +415,16 @@ A creature catalog update is acceptable only when:
 - Slash-command deployment defaults to a reviewed dry run, uses the validated Discord application ID, updates only managed commands, and aborts when the command list changes during review.
 - A scheduled retention service purges expired sessions, old tickets, completed PIN requests, operational events, and old fulfillment audit rows, and anonymizes terminal fulfillment identities. Expired PIN requests no longer block re-requesting, and interrupted fulfillment is reconciled on startup.
 - Enabled PINs require `PIN_PROTECTION_KEY` during configuration validation outside mock mode.
+- `scripts/start-v2.js` wires the runtime to SQLite, the content-fingerprinted checked-in catalog, the Discord adapter, and the mode-specific RCON transport. Mock-mode launcher integration is tested; no Debian or external test-service deployment has been performed.
 
 ### Verification
 
-- Full automated suite: 172 tests passed, 0 failed.
+- Full automated suite after Debian launcher review fixes: 185 tests passed, 0 failed.
+- Creature catalog validation and reviewed catalog coverage: passed.
 - Public example configuration validation: passed.
 - `git diff --check`: passed.
-- This checkpoint is prepared for the existing PR #17 head branch; it does not merge or deploy the runtime.
+- PR checks passed before merge. No separate post-merge check run was reported by GitHub at the checkpoint.
+- Merging did not activate V2, change V1, register Discord commands, migrate production data, or connect to live RCON.
 
 ## Historical checkpoint (2026-11-05)
 

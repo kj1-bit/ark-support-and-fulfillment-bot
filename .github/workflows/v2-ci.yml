@@ -1,0 +1,44 @@
+name: Ticketbot V2 CI
+on:
+  pull_request:
+  push:
+    branches: [integration/v2-complete-runtime, rebuild/v2-foundation]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run config:validate -- config/examples/instance.example.json
+      - run: npm run test:security
+      - run: npm run test:persistence
+      - run: npm run test:runtime
+      - run: npm run test:hardening
+      - run: npm test
+      - run: git diff --check
+      - name: Prohibit process execution and raw Discord RCON
+        shell: bash
+        run: |
+          ! grep -RInE "child_process|execFile\(|spawn\(|fork\(" src
+          ! grep -RInE "transport\.execute|\.command([^[:alnum:]_]|$)" src/features src/adapters/discord
+      - name: Reject tracked secrets and runtime data
+        shell: bash
+        run: |
+          forbidden="$(
+            git ls-files |
+            grep -E '(^|/)\.env($|\.)|\.sqlite3?($|-(wal|shm|backup)$)|(^|/)(runtime|backups|logs)/' |
+            grep -vE '^\.env\.example$' || true
+          )"
+          if [ -n "$forbidden" ]; then
+            printf 'Tracked secret or runtime-data files found:\n%s\n' "$forbidden"
+            exit 1
+          fi

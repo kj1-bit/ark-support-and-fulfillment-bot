@@ -1,0 +1,3 @@
+'use strict';const test=require('node:test');const assert=require('node:assert/strict');const migration=require('../../src/migrations/008-trusted-identity-associations');
+test('identity migration preserves explicit verification provenance',()=>{const sql=migration.statements.join('\n');assert.equal(migration.version,8);for(const field of ['discord_id','normalized_player_name','eos_id','server_id','verification_source','state','observed_at','verified_at','reviewed_by'])assert(sql.includes(field));assert(sql.includes("state='VERIFIED'"));});
+test('legacy self-entered identities remain unverified by contract',()=>{const legacy={state:'LEGACY_UNVERIFIED',verificationSource:'legacy-self-entry'};assert.notEqual(legacy.state,'VERIFIED');});

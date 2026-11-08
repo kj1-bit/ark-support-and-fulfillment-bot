@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "mode": "mock",
+    "environment": "example",
+    "logLevel": "info"
+  },
+  "discord": {
+    "clientId": "10000000000000001",
+    "guildId": "10000000000000002",
+    "tokenSecret": "DISCORD_TOKEN",
+    "roles": {
+      "staff": "10000000000000003",
+      "member": "10000000000000004",
+      "fulfillmentModerator": "10000000000000005"
+    },
+    "channels": {
+      "ticketCategory": "10000000000000006",
+      "vault": "10000000000000007",
+      "requests": "10000000000000008",
+      "playerNames": "10000000000000009",
+      "pinsDashboard": "10000000000000010",
+      "ticketLogs": "10000000000000011",
+      "fulfillment": "10000000000000012",
+      "fulfillmentLogs": "10000000000000013"
+    }
+  },
+  "ark": {
+    "timeoutMs": 10000,
+    "servers": [
+      {
+        "id": "example-test-server",
+        "name": "Example Test Server",
+        "host": "127.0.0.1",
+        "port": 27030,
+        "passwordSecret": "ARK_TEST_RCON_PASSWORD",
+        "enabled": true,
+        "testOnly": true,
+        "operations": [
+          "listOnlinePlayers",
+          "fulfillApprovedCreature"
+        ]
+      }
+    ]
+  },
+  "storage": {
+    "databasePath": "./runtime/database.sqlite",
+    "backupPath": "./runtime/backups"
+  },
+  "features": {
+    "tickets": true,
+    "pins": true,
+    "playerNames": true,
+    "shop": true,
+    "fulfillment": true,
+    "dashboards": true
+  }
+}

@@ -242,10 +242,6 @@ Available before the general staff-only command gate. Searches the imported shop
 
 Staff-only. Reimports `data/shop-catalog.csv`.
 
-### `/updatebot`
-
-Owner-only. Runs the optional script in `UPDATE_SCRIPT_PATH`. Leave the variable blank unless the operator has deliberately built and secured an update workflow.
-
 ## Main source files
 
 - `index.js`: Discord client, SQLite schema, PINs, names, shop, tickets, panels, slash commands, and retention cleanup.
@@ -267,4 +263,4 @@ Owner-only. Runs the optional script in `UPDATE_SCRIPT_PATH`. Leave the variable
 - Back up the SQLite database securely.
 - Test catalog and command changes in mock mode.
 - Review DLC ownership warnings with players.
-- Treat `/updatebot` as remote code execution controlled by `OWNER_ID` and the operating-system permissions of the bot process.
+- Deployment and rollback are operator-controlled host actions performed outside Discord. See `docs/V2_DEPLOYMENT.md`.

@@ -1,187 +1,110 @@
 'use strict';
 
-const { ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
+const { ButtonStyle, ComponentType, PermissionFlagsBits } = require('discord.js');
 const { defineFeature } = require('./feature-contract');
 const { toInteractionContext } = require('../adapters/discord/interaction-context');
 const { isButton } = require('../adapters/discord/interaction-protocol');
 const { registerInteractionListener } = require('../adapters/discord/interaction-listener');
+const { createPersistentPanel } = require('../adapters/discord/persistent-panel');
+const { sanitizeDetails } = require('../domain/dashboards/operational-event-service');
 
 const PANEL_DEFINITIONS = Object.freeze([
-  Object.freeze({ key: 'tickets', title: 'Ticket logs', channelKey: 'ticketLogs' }),
-  Object.freeze({ key: 'pins', title: 'PIN logs', channelKey: 'pinsDashboard' }),
-  Object.freeze({ key: 'fulfillment', title: 'Fulfillment logs', channelKey: 'fulfillmentLogs' })
+  { key:'tickets', title:'Ticket logs', channelKey:'ticketLogs' },
+  { key:'pins', title:'PINs dashboard', channelKey:'pinsDashboard' },
+  { key:'fulfillment', title:'Dino Fulfillment Logs', channelKey:'fulfillmentLogs' }
 ]);
 
-function panelPayload(panel) {
-  return {
-    embeds: [{
-      title: panel.title,
-      description: 'Open the latest operational events. Access is limited to authorized staff.',
-      color: 0x5865f2
-    }],
-    components: [{
-      type: ComponentType.ActionRow,
-      components: [{
-        type: ComponentType.Button,
-        custom_id: `v2:dashboard:${panel.key}:1`,
-        label: 'View latest events',
-        style: ButtonStyle.Primary
-      }]
-    }]
-  };
-}
-
-function pagePayload(panel, page, result) {
+function pagePayload(panel, page, result, pinsEnabled = false) {
   const entries = result.results.map(event => {
     const time = Math.floor(Number(event.occurredAt) / 1000);
-    const details = JSON.stringify(event.details).slice(0, 300);
-    return `**${event.type}** · <t:${time}:R>\n${details}`;
+    return `**${event.type}** · <t:${time}:R>\n${JSON.stringify(sanitizeDetails(event.details)).slice(0, 300)}`;
   });
   const description = entries.length ? entries.join('\n\n').slice(0, 4000) : 'No events recorded yet.';
   const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
-  const components = [];
-  if (page > 1 || page < lastPage) {
-    components.push({
-      type: ComponentType.ActionRow,
-      components: [
-        {
-          type: ComponentType.Button,
-          custom_id: `v2:dashboard:${panel.key}:${Math.max(1, page - 1)}`,
-          label: 'Previous',
-          style: ButtonStyle.Secondary,
-          disabled: page <= 1
-        },
-        {
-          type: ComponentType.Button,
-          custom_id: `v2:dashboard:${panel.key}:${Math.min(lastPage, page + 1)}`,
-          label: 'Next',
-          style: ButtonStyle.Secondary,
-          disabled: page >= lastPage
-        }
-      ]
-    });
-  }
   return {
-    flags: MessageFlags.Ephemeral,
-    embeds: [{ title: `${panel.title} · page ${page}`, description, color: 0x5865f2 }],
-    components
+    embeds:[{ title:`${panel.title} · page ${page}`, description, color:0x5865f2 }],
+    components:[{
+      type:ComponentType.ActionRow,
+      components:[
+        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:prev:${Math.max(1,page-1)}`,
+          label:'Previous', style:ButtonStyle.Secondary, disabled:page <= 1 },
+        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:refresh:${page}`,
+          label:panel.key === 'pins' ? 'Refresh' : 'Refresh Logs', style:ButtonStyle.Primary },
+        { type:ComponentType.Button, custom_id:`v2:dashboard:${panel.key}:next:${Math.min(lastPage,page+1)}`,
+          label:'Next', style:ButtonStyle.Secondary, disabled:page >= lastPage },
+        ...(panel.key === 'pins' && pinsEnabled ? [{
+          type:ComponentType.Button, custom_id:'v2:pin:generate-missing',
+          label:'Generate Missing PINs', style:ButtonStyle.Success
+        }] : [])
+      ]
+    }],
+    allowedMentions:{ parse:[] }
   };
+}
+
+function requireStaffChannel(channel, context) {
+  const guild = channel.guild;
+  if (!guild?.roles?.cache || typeof channel.permissionsFor !== 'function') {
+    throw new Error('Dashboard channel permissions could not be verified.');
+  }
+  for (const role of guild.roles.cache.values()) {
+    if (role.id === context.config.discord.roles.staff || role.permissions.has(PermissionFlagsBits.Administrator)) continue;
+    // Bot integration roles (this bot or others) are not human audiences; booster and other managed roles still count.
+    if (role.managed && role.tags?.botId) continue;
+    if (channel.permissionsFor(role)?.has(PermissionFlagsBits.ViewChannel)) {
+      throw new Error('Inline dashboards require staff-only channel permissions.');
+    }
+  }
 }
 
 function createDashboardsFeature() {
   let listener;
-  let readyListener;
-  let deleteListener;
-  const activeMessages = new Map();
   const panels = [];
-
-  async function restorePanel(context, panel) {
-    const channel = await context.client.channels.fetch(panel.channelId);
-    if (!channel || typeof channel.send !== 'function' || !channel.messages?.fetch) {
-      throw new TypeError(`Dashboard channel ${panel.key} cannot send messages.`);
-    }
-
-    const saved = await context.services.dashboardPanels.get(panel.key);
-    let message = null;
-    if (saved?.channelId === panel.channelId) {
-      try {
-        message = await channel.messages.fetch(saved.messageId);
-      } catch (error) {
-        if (error?.code !== 10008 && error?.status !== 404) throw error;
-      }
-    }
-
-    if (message) {
-      await message.edit(panelPayload(panel));
-    } else {
-      message = await channel.send(panelPayload(panel));
-      await context.services.dashboardPanels.save({
-        panelKey: panel.key,
-        channelId: panel.channelId,
-        messageId: message.id,
-        updatedAt: Date.now()
-      });
-    }
-    activeMessages.set(message.id, panel);
-  }
-
-  async function reportRestoreFailure(context, panel) {
-    try {
-      await context.logSink(Object.freeze({
-        type: 'discord.dashboard.restore_failed',
-        at: new Date().toISOString(),
-        data: Object.freeze({ panel: panel.key })
-      }));
-    } catch {
-      console.error('Dashboard restoration failure could not be logged.');
-    }
-  }
-
-  function scheduleRestore(context, panel) {
-    return restorePanel(context, panel).catch(() => reportRestoreFailure(context, panel));
-  }
-
   return defineFeature({
-    name: 'dashboards',
-    dependencies: [],
+    name:'dashboards',
+    dependencies:[],
     async initialize(context) {
       if (!context.services?.dashboards || !context.services?.dashboardPanels) {
         throw new TypeError('dashboards and dashboard panel services are required.');
       }
       for (const definition of PANEL_DEFINITIONS) {
         const channelId = context.config.discord.channels[definition.channelKey];
-        if (channelId) panels.push(Object.freeze({ ...definition, channelId }));
-      }
-      if (panels.length !== PANEL_DEFINITIONS.length) {
-        throw new TypeError('All dashboard log channels are required when dashboards are enabled.');
+        if (!channelId) throw new TypeError('All dashboard log channels are required when dashboards are enabled.');
+        let page = 1;
+        const panel = createPersistentPanel({
+          key:definition.key, channelId, validateChannel:requireStaffChannel,
+          payload:async () => pagePayload(definition, page,
+            await context.services.dashboards.snapshot(definition.key, page), context.config.features.pins)
+        });
+        panels.push({ ...definition, panel, setPage:value => { page = value; } });
       }
     },
     async register(context) {
       listener = registerInteractionListener(context, 'dashboards', async interaction => {
         if (!isButton(interaction)) return;
         const parts = String(interaction.customId || '').split(':');
-        const page = Number(parts[3]);
-        if (parts.length !== 4 || parts[0] !== 'v2' || parts[1] !== 'dashboard'
-          || !['tickets', 'pins', 'fulfillment'].includes(parts[2])
-          || !Number.isSafeInteger(page) || page < 1) return;
-        const panel = panels.find(item => item.key === parts[2]);
-        if (!panel) return;
-        const result = await context.services.dashboards[panel.key]({
-          page,
-          context: toInteractionContext(interaction)
-        });
-        return interaction.reply(pagePayload(panel, page, result));
+        if (parts.length !== 5 || parts[0] !== 'v2' || parts[1] !== 'dashboard'
+          || !['prev','refresh','next'].includes(parts[3])) return;
+        const page = Number(parts[4]);
+        const definition = panels.find(item => item.key === parts[2]);
+        if (!definition || !Number.isSafeInteger(page) || page < 1 || page > 1000) return;
+        if (!definition.panel.matches(interaction)) throw new Error('This log panel is no longer valid.');
+        context.services.authorization.authorize('dashboards.view', toInteractionContext(interaction));
+        requireStaffChannel(interaction.channel, context);
+        await interaction.deferUpdate();
+        const result = await context.services.dashboards[definition.key]({ page, context:toInteractionContext(interaction) });
+        definition.setPage(page);
+        await interaction.editReply(pagePayload(definition, page, result, context.config.features.pins));
       });
     },
-    async start(context) {
-      readyListener = () => Promise.all(panels.map(panel => scheduleRestore(context, panel)));
-      deleteListener = message => {
-        const panel = activeMessages.get(message.id);
-        if (!panel) return;
-        activeMessages.delete(message.id);
-        return scheduleRestore(context, panel);
-      };
-      context.client.on('ready', readyListener);
-      context.client.on('messageDelete', deleteListener);
-      if (typeof context.client.isReady === 'function' && context.client.isReady()) readyListener();
-    },
+    async start(context) { await Promise.all(panels.map(item => item.panel.start(context))); },
     async stop(context) {
-      if (listener && typeof context.client.off === 'function') {
-        context.client.off('interactionCreate', listener);
-      }
-      if (readyListener && typeof context.client.off === 'function') {
-        context.client.off('ready', readyListener);
-      }
-      if (deleteListener && typeof context.client.off === 'function') {
-        context.client.off('messageDelete', deleteListener);
-      }
+      if (listener) context.client.off('interactionCreate', listener);
+      await Promise.all(panels.map(item => item.panel.stop(context)));
       listener = null;
-      readyListener = null;
-      deleteListener = null;
-      activeMessages.clear();
       panels.length = 0;
     }
   });
 }
 
-module.exports = { createDashboardsFeature, pagePayload, panelPayload };
+module.exports = { createDashboardsFeature, pagePayload, requireStaffChannel };

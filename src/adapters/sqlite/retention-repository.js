@@ -3,7 +3,7 @@
 const TERMINAL_FULFILLMENT = "('SUCCEEDED','PARTIAL','FAILED','UNCERTAIN','CANCELED','EXPIRED')";
 const REDACTED = 'REDACTED';
 
-function createSqliteRetentionRepository(database) {
+function createSqliteRetentionRepository(database, { beforePurgeClosedTickets } = {}) {
   if (!database || typeof database.run !== 'function') {
     throw new TypeError('database run interface is required.');
   }
@@ -26,10 +26,16 @@ function createSqliteRetentionRepository(database) {
       [cutoff]
     ),
     purgeSessions: (cutoff) => changes('DELETE FROM interaction_sessions WHERE expires_at<?', [cutoff]),
-    purgeClosedTickets: (cutoff) => changes(
-      "DELETE FROM tickets WHERE state='CLOSED' AND updated_at<?",
-      [cutoff]
-    ),
+    async purgeClosedTickets(cutoff) {
+      if (beforePurgeClosedTickets) await beforePurgeClosedTickets(cutoff);
+      const columns = await database.all('PRAGMA table_info(tickets)');
+      const tracked = columns.some(column => column.name === 'channel_status');
+      return changes(
+        `DELETE FROM tickets WHERE state='CLOSED' AND updated_at<?
+         ${tracked ? "AND (channel_status IS NULL OR channel_status IN ('DELETED','FAILED'))" : ''}`,
+        [cutoff]
+      );
+    },
     purgeOperationalEvents: (cutoff) => changes('DELETE FROM operational_events WHERE occurred_at<?', [cutoff]),
     expireFulfillmentRequests: (now) => changes(
       `UPDATE fulfillment_requests SET state='EXPIRED', completed_at=?

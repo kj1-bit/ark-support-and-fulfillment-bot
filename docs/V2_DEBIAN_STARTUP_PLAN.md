@@ -15,7 +15,7 @@ Paths below are relative to the repository root unless identified as planned Deb
 | V1 public environment example | `.env.example` | Exists; not a V2 config. |
 | V2 config schema and safe example | `config/schemas/instance.schema.json`, `config/examples/instance.example.json` | Exists; example IDs are placeholders. |
 | V2 config validation | `scripts/validate-config.js` | Exists; validates and prints a redacted summary. |
-| V2 global command registration | `scripts/deploy-v2-commands.js` | Exists; dry-run by default; not a launcher and not guild-scoped. |
+| V2 retired-command cleanup | `scripts/deploy-v2-commands.js` | Exists; registers nothing; only removes the seven retired V2 global commands; dry-run by default; not a launcher and not guild-scoped. |
 | V2 executable | `scripts/start-v2.js` (`npm run start:v2`) | Reads `TICKETBOT_CONFIG_PATH` or the default ignored local config, starts V2, and handles SIGINT/SIGTERM. |
 | V2 startup coordinator | `src/composition/start-v2.js` | Injected startup lifecycle used by the executable and tests. |
 | V2 runtime wiring | `scripts/start-v2.js`, `src/composition/compose-runtime.js` | Supplies SQLite, catalog, Discord, RCON, fulfillment plan, backup, and audit dependencies. |
@@ -50,7 +50,7 @@ These are proposed paths, not paths created by this repository. Before adopting 
 2. Install Node.js 22 or newer (`package.json` declares `engines.node >=22`) and verify that the exact Debian Node/npm versions can install the locked native `sqlite3` dependency. The repository does not yet have a Debian-host rehearsal result.
 3. Create the separate V2 service identity and planned directories. Do not grant it access to V1 secrets or writable access to V1 files.
 4. Prepare a separate test Discord application/guild and ARK test server. Keep their credentials separate from production credentials.
-5. Leave command deployment disabled until the V2 command manifest is reviewed for the test application. `scripts/deploy-v2-commands.js` uses global Discord command routes, so it is not safe for a test guild if the same bot application is used elsewhere.
+5. V2 needs no command deployment; it uses panels only. If the test application still has the retired V2 commands from an earlier release, an operator may run the one-time cleanup in `scripts/deploy-v2-commands.js` (dry run first) after confirming the target application. It uses global Discord command routes, so it is not safe for a test guild if the same bot application is used elsewhere.
 6. Create the private config and test secret environment file as described below. Do not copy production credentials or configuration.
 
 ## Phase B: stage a test release

@@ -2,216 +2,152 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const { createDashboardsFeature, requireStaffChannel } = require('../../src/features/dashboards-feature');
 const { createOperationalEventService } = require('../../src/domain/dashboards/operational-event-service');
 const { createDashboardService } = require('../../src/domain/dashboards/dashboard-service');
-const { createDiscordAdapter } = require('../../src/adapters/discord/adapter');
+const { assertUniqueCustomIds } = require('../helpers/custom-ids');
 
-const channels = {
-  ticketLogs: '10000000000000011',
-  pinsDashboard: '10000000000000012',
-  fulfillmentLogs: '10000000000000013'
-};
+const id = n => `100000000000000${n.toString().padStart(2,'0')}`;
 
-function services(overrides = {}) {
-  return {
-    authorization: { authorize() {} },
-    interactionGuard: { issue: async () => ({}) },
-    fulfillment: { createPending: async x => x, confirm: async x => x, cancel: async x => x },
-    players: { byDiscord: () => null },
-    catalogManager: { current: () => ({ version: '1', creatures: [] }) },
-    playerNames: { submit: async x => x, verify: async x => x },
-    tickets: { create: async x => x, claim: async x => x, close: async x => x, reopen: async x => x },
-    pins: { request: async x => x, approve: async x => x, deliver: async x => x, cancel: async x => x },
-    shop: { search: x => x },
-    dashboards: {
-      tickets: async x => x,
-      pins: async x => x,
-      fulfillment: async x => x,
-      catalog: async x => x,
-      all: async x => x
-    },
-    dashboardPanels: { get: async () => null, save: async () => {} },
-    ...overrides
-  };
-}
-
-function dashboardConfig(enabled = true) {
-  return {
-    features: {
-      fulfillment: false, playerNames: false, tickets: false, pins: false, shop: false, dashboards: enabled
-    },
-    discord: { tokenSecret: 'DISCORD_TOKEN', channels }
-  };
-}
-
-test('dashboard service reads restart-safe repository pages', async () => {
-  const calls = [];
-  const events = createOperationalEventService({
-    repository: {
-      append: async x => x,
-      query: async x => (calls.push(x), { ...x, total: 1, results: [{ id: 1 }] })
-    }
-  });
-  const first = createDashboardService({ events });
-  assert.equal((await first.tickets({ page: 1 })).results[0].id, 1);
-  const restarted = createDashboardService({ events });
-  assert.equal((await restarted.tickets({ page: 2 })).page, 2);
-  assert.equal(calls.length, 2);
-});
-
-test('dashboard authorization is required before query delegation', async () => {
-  let queried = false;
-  const base = createDashboardService({ events: { page: async () => { queried = true; return {}; } } });
-  const dashboards = {
-    tickets(input) {
-      input.authorization.authorize('dashboards.view', input.context);
-      return base.tickets(input);
-    }
-  };
-  assert.throws(
-    () => dashboards.tickets({ context: {}, authorization: { authorize() { throw new Error('denied'); } } }),
-    /denied/
-  );
-  assert.equal(queried, false);
-});
-
-test('enabled dashboards register while disabled dashboards remain inert', async () => {
-  const calls = [];
-  const client = {
-    on: (event, listener) => calls.push(['on', event, listener]),
-    off: (event, listener) => calls.push(['off', event, listener]),
-    login: async () => calls.push(['login']),
-    destroy: async () => calls.push(['destroy'])
-  };
-  const enabled = createDiscordAdapter({
-    client,
-    config: dashboardConfig(),
-    env: { DISCORD_TOKEN: 'x' },
-    services: services()
-  });
-  assert.deepEqual(enabled.featureNames, ['dashboards']);
-  await enabled.start();
-  await enabled.stop();
-  assert.deepEqual(calls.map(x => x[0]), ['on', 'on', 'on', 'login', 'off', 'off', 'off', 'destroy']);
-
-  const inert = [];
-  const disabled = createDiscordAdapter({
-    client: { on: () => inert.push('on'), login: async () => inert.push('login'), destroy: async () => inert.push('destroy') },
-    config: dashboardConfig(false),
-    env: {},
-    services: {}
-  });
-  await disabled.start();
-  assert.deepEqual(inert, []);
-});
-
-test('persistent dashboard panels are restored on ready and recreated after deletion', async () => {
-  const listeners = new Map();
-  const sent = [];
+async function setup(t) {
+  const client = new EventEmitter();
+  client.isReady = () => true;
   const saved = new Map();
-  const channelsById = new Map(Object.values(channels).map(id => {
+  const sent = [];
+  const errors = [];
+  let deny = false;
+  const config = { discord:{ guildId:id(1),roles:{ staff:id(2) },
+    channels:{ ticketLogs:id(3),pinsDashboard:id(4),fulfillmentLogs:id(5) } },features:{ pins:true } };
+  const channels = new Map(Object.values(config.discord.channels).map(channelId => {
     const messages = new Map();
-    return [id, {
-      messages: { fetch: async id => {
-        const message = messages.get(id);
-        if (!message) throw Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const channel = {
+      id:channelId,guildId:id(1),
+      guild:{ roles:{ cache:new Map([[id(1),{ id:id(1),permissions:{ has:() => false } }]]) } },
+      permissionsFor:() => ({ has:() => false }),
+      messages:{ fetch:async key => {
+        const message = messages.get(key);
+        if (!message) throw Object.assign(new Error('Unknown Message'),{ code:10008 });
         return message;
       } },
-      send: async payload => {
-        const message = { id: `${id}-${messages.size + 1}`, payload, edit: async value => { message.payload = value; } };
-        messages.set(message.id, message);
+      send:async payload => {
+        const message = { id:`${channelId}-${sent.length}`,payload,
+          edit:async body => { message.payload = body; }, remove:() => messages.delete(message.id) };
         sent.push(message);
+        messages.set(message.id,message);
         return message;
       }
-    }];
-  }));
-  const panels = {
-    get: async key => saved.get(key) || null,
-    save: async row => saved.set(row.panelKey, row)
-  };
-  const client = {
-    on: (event, listener) => listeners.set(event, listener),
-    off: (event, listener) => listeners.delete(event),
-    channels: { fetch: async id => channelsById.get(id) },
-    login: async () => {},
-    destroy: async () => {}
-  };
-  const adapter = createDiscordAdapter({
-    client,
-    config: dashboardConfig(),
-    env: { DISCORD_TOKEN: 'x' },
-    services: services({ dashboardPanels: panels })
-  });
-  await adapter.start();
-  await listeners.get('ready')();
-  assert.equal(sent.length, 3);
-  assert.equal(saved.size, 3);
-  await listeners.get('ready')();
-  assert.equal(sent.length, 3);
-  const removed = sent[0];
-  const channelId = Object.values(channels).find(id => removed.id.startsWith(id));
-  channelsById.get(channelId).messages = {
-    fetch: async () => { throw Object.assign(new Error('Unknown Message'), { code: 10008 }); }
-  };
-  await listeners.get('messageDelete')({ id: removed.id });
-  assert.equal(sent.length, 4);
-  assert.notEqual(saved.get('tickets').messageId, removed.id);
-  await adapter.stop();
-});
-
-test('ticket, PIN, and fulfillment panels use one authorized paginated log interface', async () => {
-  let queried;
-  const response = [];
-  const listeners = [];
-  const dashboardServices = {
-    tickets: async input => (queried = input, { page: input.page, pageSize: 1, total: 2, results: [{ type: 'ticket.closed', occurredAt: 1000, details: { id: 'T-1' } }] }),
-    pins: async input => (queried = input, { page: input.page, pageSize: 1, total: 2, results: [{ type: 'pin.approved', occurredAt: 1000, details: { id: 'P-1' } }] }),
-    fulfillment: async input => (queried = input, { page: input.page, pageSize: 1, total: 2, results: [{ type: 'fulfillment.succeeded', occurredAt: 1000, details: { id: 'F-1' } }] })
-  };
-  const client = {
-    on: (event, listener) => { if (event === 'interactionCreate') listeners.push(listener); },
-    off: () => {},
-    login: async () => {},
-    destroy: async () => {}
-  };
-  const adapter = createDiscordAdapter({
-    client,
-    config: dashboardConfig(),
-    env: { DISCORD_TOKEN: 'x' },
-    services: services({ dashboards: dashboardServices })
-  });
-  await adapter.start();
-  for (const [view, id] of [['tickets', 'T-1'], ['pins', 'P-1'], ['fulfillment', 'F-1']]) {
-    const interaction = {
-      customId: `v2:dashboard:${view}:1`,
-      user: { id: '10000000000000001' },
-      guildId: '10000000000000002',
-      channelId: channels.ticketLogs,
-      member: { roles: { cache: new Map() } },
-      isButton: () => true,
-      isChatInputCommand: () => false,
-      reply: async payload => response.push(payload)
     };
-    for (const listener of listeners) await listener(interaction);
-    const payload = response.at(-1);
-    assert.match(payload.embeds[0].description, new RegExp(id));
-    assert.equal(payload.components[0].components[0].label, 'Previous');
-    assert.equal(payload.components[0].components[1].label, 'Next');
-    assert.equal(queried.page, 1);
-  }
-  await adapter.stop();
+    return [channelId,channel];
+  }));
+  client.channels = { fetch:async key => channels.get(key) };
+  const page = (key,n) => ({ page:n,pageSize:1,total:2,
+    results:[{ type:`${key === 'tickets' ? 'ticket' : key}.event`,occurredAt:1000,details:{ id:'record-1',pin:'1234' } }] });
+  const context = { client,config,logSink:async event => errors.push(event),services:{
+    authorization:{ authorize:() => { if (deny) throw new Error('Denied'); } },
+    dashboardPanels:{ get:async key => saved.get(key),save:async row => saved.set(row.panelKey,row) },
+    dashboards:{ snapshot:async (key,n) => page(key,n),
+      tickets:async input => page('tickets',input.page),
+      pins:async input => page('pins',input.page),
+      fulfillment:async input => page('fulfillment',input.page) }
+  } };
+  const feature = createDashboardsFeature();
+  await feature.initialize(context);
+  await feature.register(context);
+  await feature.start(context);
+  t.after(() => feature.stop(context));
+  const emit = (event,value) => Promise.all(client.listeners(event).map(listener => listener(value)));
+  return { context,client,saved,sent,channels,errors,emit,deny:() => { deny = true; } };
+}
+
+test('standing dashboards restore, edit in place, and recreate deleted messages with inline logs', async t => {
+  const s = await setup(t);
+  assert.equal(s.sent.length,3);
+  for (const message of s.sent) assertUniqueCustomIds(message.payload,message.payload.embeds[0].title);
+  assert.equal(s.saved.size,3);
+  assert.match(s.sent[0].payload.embeds[0].description,/record-1/);
+  assert(!JSON.stringify(s.sent).includes('1234'));
+  await s.emit('ready');
+  assert.equal(s.sent.length,3);
+  const deleted = s.sent[0];
+  deleted.remove();
+  await s.emit('messageDelete',deleted);
+  assert.equal(s.sent.length,4);
+  assert.notEqual(s.saved.get('tickets').messageId,deleted.id);
 });
 
-test('sensitive details remain absent after persistence and restart query', async () => {
+test('authorized paging updates the bound standing message, with refresh and missing-PIN buttons', async t => {
+  const s = await setup(t);
+  for (const [key,channelId] of [['tickets',id(3)],['pins',id(4)],['fulfillment',id(5)]]) {
+    let body;
+    let deferred = false;
+    const interaction = {
+      customId:`v2:dashboard:${key}:next:2`,isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId,
+      channel:s.channels.get(channelId),message:{ id:s.saved.get(key).messageId },member:{ roleIds:[id(2)] },
+      deferUpdate:async () => { deferred = true; }, editReply:async payload => { body = payload; },
+      reply:async () => assert.fail('Authorized paging should edit inline')
+    };
+    await s.emit('interactionCreate',interaction);
+    assert(deferred);
+    assert.equal(body.flags,undefined);
+    assert.match(body.embeds[0].title,/page 2/);
+    assert.deepEqual(body.components[0].components.slice(0,3).map(button => button.label),
+      ['Previous',key === 'pins' ? 'Refresh' : 'Refresh Logs','Next']);
+    if (key === 'pins') assert.equal(body.components[0].components[3].label,'Generate Missing PINs');
+  }
+});
+
+test('forged panels and unauthorized staff attempts never update public messages', async t => {
+  const s = await setup(t);
+  const interaction = {
+    customId:'v2:dashboard:tickets:refresh:1',isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId:id(3),
+    channel:s.channels.get(id(3)),message:{ id:'forged' },member:{ roleIds:[] },
+    deferUpdate:async () => assert.fail('Invalid panel must not be acknowledged as update'),
+    reply:async payload => assert.equal(payload.flags,64)
+  };
+  await s.emit('interactionCreate',interaction);
+  s.deny();
+  interaction.message.id = s.saved.get('tickets').messageId;
+  await s.emit('interactionCreate',interaction);
+  assert.equal(s.errors.filter(event => event.type === 'discord.interaction.failed').length,2);
+});
+
+test('inline dashboard refuses channels visible to ordinary roles', () => {
+  const context = { config:{ discord:{ roles:{ staff:id(2) } } } };
+  assert.throws(() => requireStaffChannel({
+    guild:{ roles:{ cache:new Map([[id(1),{ id:id(1),permissions:{ has:() => false } }]]) } },
+    permissionsFor:() => ({ has:() => true })
+  },context),/staff-only/);
+});
+
+test('inline dashboard tolerates bot integration roles but not boosters or ordinary roles', () => {
+  const context = { config:{ discord:{ roles:{ staff:id(2) } } } };
+  const role = (roleId,extra = {}) => ({ id:roleId,permissions:{ has:() => false },...extra });
+  const channel = roles => ({
+    guild:{ roles:{ cache:new Map(roles.map(item => [item.id,item])) } },
+    permissionsFor:item => ({ has:() => item.id !== id(1) })
+  });
+  const everyone = role(id(1));
+  const ownBot = role(id(12),{ managed:true,tags:{ botId:id(13) } });
+  const otherBot = role(id(14),{ managed:true,tags:{ botId:id(15) } });
+  const staff = role(id(2));
+  requireStaffChannel(channel([everyone,staff,ownBot,otherBot]),context);
+  assert.throws(() => requireStaffChannel(channel([everyone,ownBot,
+    role(id(16),{ managed:true,tags:{ premiumSubscriberRole:true } })]),context),/staff-only/);
+  assert.throws(() => requireStaffChannel(channel([everyone,ownBot,role(id(17))]),context),/staff-only/);
+  assert.throws(() => requireStaffChannel(channel([everyone,role(id(18),{ tags:{ botId:id(15) } })]),context),/staff-only/);
+});
+
+test('sanitized persisted events survive service restart without PIN material', async () => {
   let stored;
   const repository = {
-    append: async event => (stored = JSON.parse(JSON.stringify(event)), event),
-    query: async () => ({ page: 1, pageSize: 10, total: 1, results: [stored] })
+    append:async event => (stored = JSON.parse(JSON.stringify(event)),event),
+    query:async () => ({ page:1,pageSize:10,total:1,results:[stored] })
   };
-  const events = createOperationalEventService({ repository, clock: () => 1 });
-  await events.record('pin.delivered', { id: 'r', pin: '1234', protectedPin: 'sealed', eosId: 'full', status: 'done' });
-  const restarted = createDashboardService({ events: createOperationalEventService({ repository, clock: () => 2 }) });
+  await createOperationalEventService({ repository,clock:() => 1 }).record('pin.delivered',
+    { id:'r',pin:'1234',protectedPin:'sealed',eosId:'full',status:'done' });
+  const restarted = createDashboardService({ events:createOperationalEventService({ repository }) });
   const text = JSON.stringify(await restarted.pins({}));
-  for (const value of ['1234', 'sealed', 'full']) assert(!text.includes(value));
+  for (const value of ['1234','sealed','full']) assert(!text.includes(value));
   assert(text.includes('done'));
 });

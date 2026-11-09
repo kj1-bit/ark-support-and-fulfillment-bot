@@ -34,6 +34,7 @@ async function startV2(options = {}) {
         playerNames: runtime.playerNames,
         tickets: runtime.tickets,
         pins: runtime.pins,
+        vaultPins:runtime.vaultPins,
         shop: runtime.shop,
         dashboards: runtime.dashboards,
         dashboardPanels: runtime.dashboardPanels,

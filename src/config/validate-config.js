@@ -93,7 +93,11 @@ function validateConfig(input, options={}) {
     }
     if (features.tickets===true) {
       if (!discord?.roles?.staff) issues.push('configuration.features.tickets: staff role is required');
+      if (!discord?.channels?.ticketCategory) issues.push('configuration.features.tickets: ticketCategory is required');
       if (!discord?.channels?.requests||!discord?.channels?.ticketLogs) issues.push('configuration.features.tickets: requests and ticketLogs channels are required');
+    }
+    if (features.shop===true && !discord?.channels?.requests) {
+      issues.push('configuration.features.shop: requests channel is required');
     }
     if (features.pins===true) {
       if (!discord?.roles?.staff) issues.push('configuration.features.pins: staff role is required');

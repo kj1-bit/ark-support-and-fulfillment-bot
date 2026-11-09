@@ -21,7 +21,7 @@ V2 is designed around validated configuration, feature-specific authorization, p
 
 - Player-name submission and staff verification
 - Support tickets
-- Protected PIN requests, approval, and private delivery
+- Encrypted Vault PINs, private player retrieval, and a staff-only name/PIN directory
 - Shop/catalog search
 - Moderator-controlled fulfillment to verified online players
 - Persistent, paginated staff log panels

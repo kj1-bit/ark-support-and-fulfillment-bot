@@ -12,6 +12,17 @@ function createSqliteVaultPinRepository(database) {
   const get = (guildId, userId) => database.get(SELECT, [guildId, userId]);
   return Object.freeze({
     get,
+    async directoryPage(guildId, page, pageSize) {
+      const { total } = await database.get('SELECT COUNT(*) AS total FROM vault_pins WHERE guild_id=?', [guildId]);
+      const currentPage = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
+      const results = await database.all(
+        `SELECT v.user_id AS userId,p.player_name AS playerName,v.protected_pin AS protectedPin
+         FROM vault_pins v LEFT JOIN player_names p ON p.discord_id=v.user_id
+         WHERE v.guild_id=? ORDER BY v.user_id LIMIT ? OFFSET ?`,
+        [guildId, pageSize, (currentPage - 1) * pageSize]
+      );
+      return { page: currentPage, pageSize, total, results };
+    },
     async insertIfAbsent(record) {
       const result = await database.run(
         `INSERT INTO vault_pins (guild_id, user_id, protected_pin, source, created_at, updated_at)

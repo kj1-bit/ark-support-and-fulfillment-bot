@@ -3,7 +3,7 @@
 const { ephemeral, respond } = require('./interaction-protocol');
 const { safeInteractionMessage } = require('./safe-response');
 
-async function reportInteractionError(context, feature, interaction, error) {
+async function reportInteractionError(context, feature, interaction, error, deferredUpdate = false) {
   try {
     await context.logSink(Object.freeze({
       type: 'discord.interaction.failed',
@@ -20,7 +20,11 @@ async function reportInteractionError(context, feature, interaction, error) {
     publicMessage = 'The request could not be completed safely. A moderator can review the audit log.';
   }
   try {
-    await respond(interaction, ephemeral(publicMessage));
+    if (deferredUpdate) {
+      await interaction.followUp(ephemeral(publicMessage));
+    } else {
+      await respond(interaction, ephemeral(publicMessage));
+    }
   } catch {
     console.error('Discord interaction error response could not be sent.');
   }
@@ -34,4 +38,4 @@ function registerInteractionListener(context, feature, handler) {
   return listener;
 }
 
-module.exports = { registerInteractionListener };
+module.exports = { registerInteractionListener, reportInteractionError };

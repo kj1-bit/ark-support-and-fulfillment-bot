@@ -112,10 +112,12 @@ test('Discord receives narrow services and environment without database or trans
       'fulfillment',
       'interactionGuard',
       'onlinePlayers',
-      'pins',
+      'pinDirectory',
+      'pinDirectoryRestoration',
       'playerNames',
       'playerRepository',
       'players',
+      'retiredPinControls',
       'shop',
       'tickets',
       'vaultPins'

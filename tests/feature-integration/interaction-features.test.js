@@ -178,14 +178,14 @@ test('ticket controls offer Claim only while a ticket is open and keep unique cu
   }
 });
 
-test('PIN and player-name modals submit through their services', async () => {
+test('retired PIN modals do not submit while player-name modals still work', async () => {
   const { adapter, listeners, calls } = makeAdapter();
   await adapter.start();
   await dispatch(listeners, baseInteraction({
     channelId: NAMES_CHANNEL, isModalSubmit: () => true, customId: 'v2:pin:request',
     fields: { getTextInputValue: () => '0123' }
   }));
-  assert.equal(calls.pin.pin, '0123');
+  assert.equal(calls.pin, null);
 
   const setName = button('v2:player-name:set', { channelId: NAMES_CHANNEL, message: { id: panelMessage(NAMES_CHANNEL) } });
   await dispatch(listeners, setName);
@@ -198,17 +198,15 @@ test('PIN and player-name modals submit through their services', async () => {
   await adapter.stop();
 });
 
-test('Deliver button privately messages the request owner without exposing the PIN in the interaction reply', async () => {
+test('retired custom Deliver button never sends a PIN or mutates a request', async () => {
   const { adapter, listeners, calls } = makeAdapter();
   await adapter.start();
   const interaction = button('v2:pin:deliver:PIN-1', { channelId: PIN_DASHBOARD, message: { id: '10000000000000030' } });
   await dispatch(listeners, interaction);
-  assert.deepEqual(calls.pinMessage, {
-    id: identity.id,
-    content: 'Your approved vault PIN is **0123**. Do not share it.'
-  });
+  assert.equal(calls.pinMessage, null);
   assert.equal(interaction.replies.length, 1);
   assert(!JSON.stringify(interaction.replies).includes('0123'));
+  assert.match(interaction.replies[0].content, /retired/);
   await adapter.stop();
 });
 

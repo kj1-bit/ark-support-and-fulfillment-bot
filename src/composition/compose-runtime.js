@@ -11,8 +11,8 @@ const { createSessionStore } = require('../domain/sessions/session-store');
 const { createPlayerNameService } = require('../domain/player-names/player-name-service');
 const { createTicketService } = require('../domain/tickets/ticket-service');
 const { createCatalogSearchService } = require('../domain/shop/catalog-search-service');
-const { createPinService } = require('../domain/pins/pin-service');
 const { createVaultPinService } = require('../domain/pins/vault-pin-service');
+const { createPinDirectoryService } = require('../domain/pins/pin-directory-service');
 const { createSqliteFulfillmentRepository } = require('../adapters/sqlite/fulfillment-repository');
 const { createSqliteSessionRepository } = require('../adapters/sqlite/session-repository');
 const { createSqlitePlayerRepository } = require('../adapters/sqlite/player-repository');
@@ -84,13 +84,6 @@ function buildAuthorizationOptions(config) {
   }
   if (enabled.pins === true) {
     capabilities['pins.moderate'] = Object.freeze({
-      roleIds: Object.freeze([staff]),
-      channelIds: Object.freeze([
-        requireId(channels.vault, 'discord.channels.vault'),
-        requireId(channels.pinsDashboard, 'discord.channels.pinsDashboard')
-      ])
-    });
-    capabilities['pins.deliver'] = Object.freeze({
       roleIds: Object.freeze([staff]),
       channelIds: Object.freeze([
         requireId(channels.vault, 'discord.channels.vault'),
@@ -247,10 +240,12 @@ async function composeRuntime(options = {}) {
     channelConfig:config.features.tickets ? config.discord : null
   });
   const pinRepository = createSqlitePinRepository(database);
-  const pins = pinProtector
-    ? createPinService({ repository: pinRepository, playerNames, authorization, protector: pinProtector, audit, clock, uuid: randomUUID })
-    : null;
   const vaultPinRepository = createSqliteVaultPinRepository(database);
+  const pinDirectory = pinProtector ? createPinDirectoryService({
+    repository: vaultPinRepository, protector: pinProtector, authorization,
+    guildId: config.discord.guildId, channelId: config.discord.channels.pinsDashboard,
+    staffRoleId: config.discord.roles.staff
+  }) : null;
   const vaultPins = pinProtector
     ? createVaultPinService({
       repository: vaultPinRepository,
@@ -310,10 +305,12 @@ async function composeRuntime(options = {}) {
     playerNameRepository,
     tickets,
     ticketRepository,
-    pins,
+    retiredPinControls: pinProtector ? Object.freeze({ list: pinRepository.listRetiredControls }) : null,
     pinRepository,
     vaultPins,
     vaultPinRepository,
+    pinDirectory: pinDirectory?.staff,
+    pinDirectoryRestoration: pinDirectory?.restoration,
     shop,
     dashboards,
     dashboardPanels,

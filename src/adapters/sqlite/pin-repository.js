@@ -11,6 +11,14 @@ function createSqlitePinRepository(database) {
   const get = id => database.get('SELECT id,actor_id AS actorId,player_name AS playerName,guild_id AS guildId,channel_id AS channelId,protected_pin AS protectedPin,state,moderator_id AS moderatorId,created_at AS createdAt,updated_at AS updatedAt,expires_at AS expiresAt FROM pin_requests WHERE id=?', [id]);
   return Object.freeze({
     get,
+    listRetiredControls({ guildId, channelId, after = '', limit = 100 }) {
+      return database.all(
+        `SELECT r.id,m.message_id AS messageId,m.channel_id AS channelId
+         FROM pin_requests r JOIN pin_request_messages m ON m.request_id=r.id
+         WHERE r.guild_id=? AND m.channel_id=? AND r.id>? ORDER BY r.id LIMIT ?`,
+        [guildId, channelId, after, Math.max(1, Math.min(100, limit))]
+      );
+    },
     async expireStale(actorId, now) {
       const result = await database.run(`UPDATE pin_requests SET state='EXPIRED',protected_pin=NULL,updated_at=? WHERE actor_id=? AND state IN ('PENDING','APPROVED') AND expires_at<=?`, [now, actorId, now]);
       return result.changes;

@@ -137,6 +137,21 @@ test('self-service enforces guild, vault channel, and member role', async () => 
   assert.equal(repository.rows.size, 1);
 });
 
+test('players receive only their own Vault PIN even if they supply another player as a target', async () => {
+  const { service, advance } = makeVault({ sequence:[5820,6942] });
+  const own = [];
+  const other = [];
+  await service.deliverOwn({ context:memberContext(),userId:OTHER,
+    deliver:async pin => { own.push(pin); return true; } });
+  await service.deliverOwn({ context:memberContext({ actorId:OTHER }),userId:USER,
+    deliver:async pin => { other.push(pin); return true; } });
+  advance(30000);
+  await service.deliverOwn({ context:memberContext(),userId:OTHER,
+    deliver:async pin => { own.push(pin); return true; } });
+  assert.deepEqual(own,['5820','5820']);
+  assert.deepEqual(other,['6942']);
+});
+
 test('DM failures, cooldown, and concurrent clicks produce explicit errors without exposing the PIN', async () => {
   const { service, audits, advance } = makeVault({ sequence: [5820] });
   await assert.rejects(

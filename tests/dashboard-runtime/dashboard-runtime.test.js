@@ -7,11 +7,13 @@ const { createDashboardsFeature, requireStaffChannel } = require('../../src/feat
 const { createOperationalEventService } = require('../../src/domain/dashboards/operational-event-service');
 const { createDashboardService } = require('../../src/domain/dashboards/dashboard-service');
 const { assertUniqueCustomIds } = require('../helpers/custom-ids');
+const { privatePinChannel } = require('../helpers/private-pin-channel');
 
 const id = n => `100000000000000${n.toString().padStart(2,'0')}`;
 
 async function setup(t) {
   const client = new EventEmitter();
+  client.user = { id: id(90) };
   client.isReady = () => true;
   const saved = new Map();
   const sent = [];
@@ -22,16 +24,15 @@ async function setup(t) {
   const channels = new Map(Object.values(config.discord.channels).map(channelId => {
     const messages = new Map();
     const channel = {
+      ...privatePinChannel({ channelId, guildId:id(1), staffRoleId:id(2) }),
       id:channelId,guildId:id(1),
-      guild:{ roles:{ cache:new Map([[id(1),{ id:id(1),permissions:{ has:() => false } }]]) } },
-      permissionsFor:() => ({ has:() => false }),
       messages:{ fetch:async key => {
         const message = messages.get(key);
         if (!message) throw Object.assign(new Error('Unknown Message'),{ code:10008 });
         return message;
       } },
       send:async payload => {
-        const message = { id:`${channelId}-${sent.length}`,payload,
+        const message = { id:`${channelId}-${sent.length}`,payload, author:client.user,
           edit:async body => { message.payload = body; }, remove:() => messages.delete(message.id) };
         sent.push(message);
         messages.set(message.id,message);
@@ -46,6 +47,10 @@ async function setup(t) {
   const context = { client,config,logSink:async event => errors.push(event),services:{
     authorization:{ authorize:() => { if (deny) throw new Error('Denied'); } },
     dashboardPanels:{ get:async key => saved.get(key),save:async row => saved.set(row.panelKey,row) },
+    pinDirectory:{ page:async ({ page:n }) => ({ page:n,pageSize:1,total:2,
+      results:[{ userId:id(6),playerName:'Survivor',pin:'5820' }] }) },
+    pinDirectoryRestoration:{ page:async n => ({ page:n,pageSize:1,total:2,
+      results:[{ userId:id(6),playerName:'Survivor',pin:'5820' }] }) },
     dashboards:{ snapshot:async (key,n) => page(key,n),
       tickets:async input => page('tickets',input.page),
       pins:async input => page('pins',input.page),
@@ -56,8 +61,8 @@ async function setup(t) {
   await feature.register(context);
   await feature.start(context);
   t.after(() => feature.stop(context));
-  const emit = (event,value) => Promise.all(client.listeners(event).map(listener => listener(value)));
-  return { context,client,saved,sent,channels,errors,emit,deny:() => { deny = true; } };
+  const emit = (event,...values) => Promise.all(client.listeners(event).map(listener => listener(...values)));
+  return { context,client,feature,saved,sent,channels,errors,emit,deny:() => { deny = true; } };
 }
 
 test('standing dashboards restore, edit in place, and recreate deleted messages with inline logs', async t => {
@@ -82,7 +87,7 @@ test('authorized paging updates the bound standing message, with refresh and mis
     let body;
     let deferred = false;
     const interaction = {
-      customId:`v2:dashboard:${key}:next:2`,isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId,
+      customId:`v2:dashboard:${key}:${key === 'pins' ? 'directory-next' : 'next'}:2`,isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId,
       channel:s.channels.get(channelId),message:{ id:s.saved.get(key).messageId },member:{ roleIds:[id(2)] },
       deferUpdate:async () => { deferred = true; }, editReply:async payload => { body = payload; },
       reply:async () => assert.fail('Authorized paging should edit inline')
@@ -93,7 +98,7 @@ test('authorized paging updates the bound standing message, with refresh and mis
     assert.match(body.embeds[0].title,/page 2/);
     assert.deepEqual(body.components[0].components.slice(0,3).map(button => button.label),
       ['Previous',key === 'pins' ? 'Refresh' : 'Refresh Logs','Next']);
-    if (key === 'pins') assert.equal(body.components[0].components[3].label,'Generate Missing PINs');
+    if (key === 'pins') assert.equal(body.components[0].components[4].label,'Generate Missing PINs');
   }
 });
 
@@ -150,4 +155,226 @@ test('sanitized persisted events survive service restart without PIN material', 
   const text = JSON.stringify(await restarted.pins({}));
   for (const value of ['1234','sealed','full']) assert(!text.includes(value));
   assert(text.includes('done'));
+});
+
+function pinInteraction(s, action = 'directory-refresh', extra = {}) {
+  const click = {
+    customId:`v2:dashboard:pins:${action}:1`,isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId:id(4),
+    channel:s.channels.get(id(4)),message:{ id:s.saved.get('pins').messageId },member:{ roleIds:[id(2)] },replies:[],
+    deferUpdate:async () => { click.deferred = true; },
+    editReply:async body => { click.body = body; }, reply:async body => click.replies.push(body),
+    followUp:async body => click.replies.push(body),
+    ...extra
+  };
+  return click;
+}
+
+function currentPinMessage(s) {
+  return s.sent.find(message => message.id === s.saved.get('pins').messageId);
+}
+
+test('PIN directory refresh, activity toggle, restart and deleted panels preserve only the current binding', async t => {
+  const s = await setup(t);
+  const pin = currentPinMessage(s);
+  assert.match(pin.payload.embeds[0].description,/Survivor/);
+  assert.match(pin.payload.embeds[0].description,/5820/);
+  const refreshed = pinInteraction(s);
+  await s.emit('interactionCreate',refreshed);
+  assert.match(refreshed.body.embeds[0].description,/5820/);
+  const activity = pinInteraction(s,'activity-refresh');
+  await s.emit('interactionCreate',activity);
+  assert(!JSON.stringify(activity.body).includes('5820'));
+  assert.match(activity.body.embeds[0].description,/pins.event/);
+  await s.feature.stop(s.context);
+  const restarted = createDashboardsFeature();
+  await restarted.initialize(s.context);
+  await restarted.register(s.context);
+  await restarted.start(s.context);
+  t.after(() => restarted.stop(s.context));
+  assert.equal(s.sent.length,3);
+  assert.match(pin.payload.embeds[0].description,/5820/);
+  pin.remove();
+  await s.emit('messageDelete',pin);
+  assert.equal(s.sent.length,4);
+  const replacement = s.sent[3];
+  assert.match(replacement.payload.embeds[0].description,/5820/);
+  const stale = pinInteraction(s,'directory-refresh',{ message:{ id:pin.id } });
+  await s.emit('interactionCreate',stale);
+  assert.equal(stale.body,undefined);
+  assert.equal(stale.replies[0].flags,64);
+});
+
+test('permission changes redact bound PIN content and never call decryption in an unsafe channel', async t => {
+  const s = await setup(t);
+  const pin = currentPinMessage(s);
+  let reads = 0;
+  s.context.services.pinDirectoryRestoration.page = async () => { reads += 1; assert.fail('Unsafe decrypt'); };
+  const channel = s.channels.get(id(4));
+  channel.permissionsFor = () => ({ has:() => true });
+  await s.emit('channelUpdate',channel);
+  assert.equal(reads,0);
+  assert.deepEqual(pin.payload.embeds,[]);
+  assert.deepEqual(pin.payload.components,[]);
+  assert.match(pin.payload.content,/privacy/);
+  assert(!JSON.stringify(s.errors).includes('5820'));
+  assert(s.errors.some(event => event.type === 'discord.panel.restore_failed'));
+  channel.permissionsFor = () => ({ has:() => false });
+  s.context.services.pinDirectoryRestoration.page = async () => ({
+    page:1,pageSize:10,total:1,results:[{ userId:id(6),playerName:'P',pin:'5820' }]
+  });
+  await s.emit('roleUpdate',
+    { id:id(2),guild:channel.guild,permissions:{ has:() => false } },
+    { id:id(2),guild:channel.guild,permissions:{ has:() => true } });
+  assert.equal(pin.payload.content,null);
+  assert.match(pin.payload.embeds[0].description,/5820/);
+});
+
+test('paging checks fresh member-overwrite privacy before reads and clears a previously readable panel', async t => {
+  const s = await setup(t);
+  const channel = s.channels.get(id(4));
+  let reads = 0;
+  s.context.services.pinDirectory.page = async () => { reads += 1; assert.fail('Unsafe read'); };
+  s.context.services.pinDirectoryRestoration.page = async () => { reads += 1; assert.fail('Unsafe restoration read'); };
+  channel.permissionOverwrites.cache.set(id(7),{ id:id(7),type:1 });
+  channel.members.set(id(7),{
+    id:id(7),user:{ bot:false },roles:{ cache:new Set() },permissions:{ has:() => false }
+  });
+  channel.permissionsFor = item => ({ has:() => item.id === id(7) });
+  const click = pinInteraction(s);
+  await s.emit('interactionCreate',click);
+  assert.equal(click.deferred,true);
+  assert.equal(click.body,undefined);
+  assert.equal(click.replies[0].flags,64);
+  assert.equal(reads,0);
+  assert.deepEqual(currentPinMessage(s).payload.embeds,[]);
+});
+
+test('a permission change during directory loading prevents publishing the loaded page', async t => {
+  const s = await setup(t);
+  const channel = s.channels.get(id(4));
+  s.context.services.pinDirectory.page = async () => {
+    channel.permissionsFor = () => ({ has:() => true });
+    return { page:1,pageSize:10,total:1,results:[{ userId:id(6),playerName:'P',pin:'5820' }] };
+  };
+  const click = pinInteraction(s);
+  await s.emit('interactionCreate',click);
+  assert.equal(click.body,undefined);
+  assert(!JSON.stringify(click.replies).includes('5820'));
+  assert.deepEqual(currentPinMessage(s).payload.embeds,[]);
+});
+
+test('wrong guild/channel, stale panels and unauthorized directory paging never read PINs', async t => {
+  const s = await setup(t);
+  s.context.services.pinDirectory.page = () => assert.fail('Unauthorized read');
+  for (const extra of [{ guildId:id(20) },{ channelId:id(3) },{ message:{ id:'stale' } }]) {
+    const click = pinInteraction(s,'directory-refresh',extra);
+    await s.emit('interactionCreate',click);
+    assert.equal(click.body,undefined);
+    assert.equal(click.replies[0].flags,64);
+  }
+  s.deny();
+  const denied = pinInteraction(s);
+  await s.emit('interactionCreate',denied);
+  assert.equal(denied.body,undefined);
+  assert.equal(denied.replies[0].flags,64);
+});
+
+test('startup will not overwrite a foreign saved panel and logs no PIN on unreadable page failures', async t => {
+  const s = await setup(t);
+  const pin = currentPinMessage(s);
+  pin.author = { id:id(7) };
+  s.context.services.pinDirectoryRestoration.page = () => assert.fail('Foreign bound message must not trigger decrypt');
+  await s.emit('ready');
+  assert(s.errors.some(event => event.type === 'discord.panel.restore_failed'));
+  pin.author = s.client.user;
+  s.context.services.pinDirectoryRestoration.page = async () => { throw new Error('sealed 5820'); };
+  await s.emit('ready');
+  assert.deepEqual(pin.payload.embeds,[]);
+  assert(!JSON.stringify(s.errors).includes('5820'));
+  assert(!JSON.stringify(s.errors).includes('sealed'));
+});
+
+test('a newly posted PIN panel is redacted if its binding cannot be persisted', async t => {
+  const s = await setup(t);
+  const pin = currentPinMessage(s);
+  s.context.services.dashboardPanels.save = async record => {
+    if (record.panelKey === 'pins') throw new Error('private storage failure');
+  };
+  pin.remove();
+  await s.emit('messageDelete',pin);
+  const orphan = s.sent[s.sent.length - 1];
+  assert.deepEqual(orphan.payload.embeds,[]);
+  assert.deepEqual(orphan.payload.components,[]);
+  assert(s.errors.some(event => event.type === 'discord.panel.restore_failed'));
+  assert(!JSON.stringify(s.errors).includes('private storage failure'));
+});
+
+test('a configured PIN channel move redacts the old bound message before restoring in the new private destination', async t => {
+  const s = await setup(t);
+  const old = currentPinMessage(s);
+  await s.feature.stop(s.context);
+  s.context.config.discord.channels.pinsDashboard = id(8);
+  s.channels.set(id(8),{ ...s.channels.get(id(4)),id:id(8) });
+  const restarted = createDashboardsFeature();
+  await restarted.initialize(s.context);
+  await restarted.register(s.context);
+  await restarted.start(s.context);
+  t.after(() => restarted.stop(s.context));
+  assert.deepEqual(old.payload.embeds,[]);
+  assert.equal(s.saved.get('pins').channelId,id(8));
+  assert.match(currentPinMessage(s).payload.embeds[0].description,/5820/);
+});
+
+test('permission failures redact the known binding even when the panel repository is unavailable', async t => {
+  const s = await setup(t);
+  const pin = currentPinMessage(s);
+  s.context.services.dashboardPanels.get = async () => { throw new Error('private database path'); };
+  await s.emit('channelUpdate',s.channels.get(id(4)));
+  assert.deepEqual(pin.payload.embeds,[]);
+  assert(!JSON.stringify(s.errors).includes('private database path'));
+});
+
+test('failed redaction reports a fixed notice without leaking Discord payload/error material', async t => {
+  const s = await setup(t);
+  const pin = currentPinMessage(s);
+  pin.edit = async () => { throw new Error('Discord payload contained sealed 5820'); };
+  s.channels.get(id(4)).permissionsFor = () => ({ has:() => true });
+  await s.emit('channelUpdate',s.channels.get(id(4)));
+  assert(s.errors.some(event => event.type === 'discord.panel.redaction_failed'));
+  assert(!JSON.stringify(s.errors).includes('5820'));
+  assert(!JSON.stringify(s.errors).includes('sealed'));
+});
+
+test('PIN paging is acknowledged before slow privacy checks and redaction, with failures only in private follow-ups', async t => {
+  const s = await setup(t);
+  const channel = s.channels.get(id(4));
+  channel.permissionsFor = () => ({ has:() => true });
+  s.context.services.pinDirectory.page = () => assert.fail('Unsafe directory must not be read');
+  const click = pinInteraction(s);
+  let release;
+  const order = [];
+  click.deferUpdate = async () => { order.push('acknowledged'); click.deferred = true; };
+  const fetch = s.client.channels.fetch;
+  let first = true;
+  s.client.channels.fetch = async (...args) => {
+    order.push('fetch');
+    if (first) {
+      first = false;
+      return new Promise(resolve => { release = () => resolve(channel); });
+    }
+    return fetch(...args);
+  };
+  const paging = s.emit('interactionCreate',click);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(order,['acknowledged','fetch']);
+  assert.equal(click.deferred,true);
+  assert.equal(click.replies.length,0);
+  assert.equal(click.body,undefined);
+  release();
+  await paging;
+  assert.equal(click.replies.length,1);
+  assert.equal(click.replies[0].flags,64);
+  assert.equal(click.body,undefined);
+  assert.deepEqual(currentPinMessage(s).payload.embeds,[]);
+  assert(!JSON.stringify(click.replies).includes('5820'));
 });

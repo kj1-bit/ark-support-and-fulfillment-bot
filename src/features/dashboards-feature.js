@@ -129,6 +129,15 @@ function pinPagePayload(panel, result) {
   };
 }
 
+// Resolved per render so catalog activations apply to the next page without restarting.
+function activeCreatures(context) {
+  try {
+    return context.services.catalogManager?.current?.() || context.services.creatures || null;
+  } catch {
+    return context.services.creatures || null;
+  }
+}
+
 function createDashboardsFeature() {
   let listener;
   let pinsChangedListener;
@@ -157,7 +166,7 @@ function createDashboardsFeature() {
           payload:async () => directory
             ? pinPagePayload(definition, await context.services.pinDirectoryRestoration.page(page))
             : definition.key === 'pins' ? { content:'Vault PINs are disabled.', embeds:[], components:[] }
-              : pagePayload({ ...definition,creatures:context.services.creatures },
+              : pagePayload({ ...definition,creatures:activeCreatures(context) },
                 page, await context.services.dashboards.snapshot(definition.key, page))
         });
         panels.push({ ...definition, panel, directory, setPage:value => { page = value; } });
@@ -231,7 +240,7 @@ function createDashboardsFeature() {
         await interaction.deferUpdate();
         const result = await context.services.dashboards[definition.key]({ page, context:toInteractionContext(interaction) });
         definition.setPage(page);
-        await interaction.editReply(pagePayload({ ...definition,creatures:context.services.creatures },
+        await interaction.editReply(pagePayload({ ...definition,creatures:activeCreatures(context) },
           page, result, context.config.features.pins));
       });
     },

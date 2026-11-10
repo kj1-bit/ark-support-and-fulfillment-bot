@@ -36,6 +36,16 @@ function createSqliteCatalogStore(database, { clock = Date.now } = {}) {
     return row ? JSON.parse(row.catalog_json) : null;
   }
 
+  async function isRetained(version) {
+    const row = await database.get(
+      `SELECT 1 AS retained
+       FROM catalog_versions
+       WHERE version = ? AND state = 'RETAINED'`,
+      [version]
+    );
+    return Boolean(row);
+  }
+
   async function activate(registry) {
     await database.executeSql('BEGIN IMMEDIATE');
     try {
@@ -81,7 +91,7 @@ function createSqliteCatalogStore(database, { clock = Date.now } = {}) {
     return row ? JSON.parse(row.catalog_json) : null;
   }
 
-  return Object.freeze({ activate, load, loadActive, previousActive });
+  return Object.freeze({ activate, isRetained, load, loadActive, previousActive });
 }
 
 module.exports = { createSqliteCatalogStore };

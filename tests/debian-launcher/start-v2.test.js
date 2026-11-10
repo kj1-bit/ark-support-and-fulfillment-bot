@@ -166,11 +166,12 @@ test('production storage paths are checked against the source root, not the work
   ));
 });
 
-test('a changed shipped catalog is activated on restart instead of being ignored', async () => {
+test('launcher activates unseen catalogs and requires an exact override to restore a retained catalog', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ticketbot-v2-catalog-'));
   const configPath = path.join(root, 'instance.json');
   const source = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../data/dino-catalog.json'), 'utf8'));
   const catalogPath = path.join(root, 'catalog.json');
+  const logs = [];
   fs.writeFileSync(configPath, JSON.stringify({
     schemaVersion: 1,
     runtime: { mode: 'mock', environment: 'catalog-test', logLevel: 'error' },
@@ -183,26 +184,81 @@ test('a changed shipped catalog is activated on restart instead of being ignored
     storage: { databasePath: 'runtime/database.sqlite', backupPath: 'runtime/backups' },
     features: { tickets: false, pins: false, playerNames: false, shop: false, fulfillment: false, dashboards: false }
   }));
-  const start = () => startV2Service({
-    sourceRoot: root, configPath, catalogPath, env: {}, write: () => {},
+  const start = (env = {}) => startV2Service({
+    sourceRoot: root, configPath, catalogPath, env, write: line => logs.push(line),
     createDiscordClient: () => ({ on() {}, off() {}, login: async () => {}, destroy: async () => {} })
   });
+  const rollbackWarnings = () => logs
+    .filter(line => line.includes('"runtime.catalog.rollback-blocked"'))
+    .map(line => JSON.parse(line));
 
   try {
     fs.writeFileSync(catalogPath, JSON.stringify(source));
     const first = await start();
     const firstVersion = first.runtime.catalogManager.current().version;
+    assert.equal(typeof first.runtime.catalogStore.isRetained, 'function');
+    assert.equal(await first.runtime.catalogStore.isRetained(firstVersion), false);
+    assert.equal(first.runtime.catalogManager.current().version, firstVersion);
+    assert.deepEqual(rollbackWarnings(), []);
     await first.stop();
 
     const changed = source.map(creature => creature.id === 'rex' ? { ...creature, name: 'Rex (renamed)' } : creature);
     fs.writeFileSync(catalogPath, JSON.stringify(changed));
     const second = await start();
+    const secondVersion = second.runtime.catalogManager.current().version;
     try {
       const active = second.runtime.catalogManager.current();
       assert.notEqual(active.version, firstVersion);
+      assert.equal(active.version, secondVersion);
       assert.equal(active.get('rex').name, 'Rex (renamed)');
+      assert.equal(await second.runtime.catalogStore.isRetained(firstVersion), true);
     } finally {
       await second.stop();
+    }
+
+    fs.writeFileSync(catalogPath, JSON.stringify(source));
+    logs.length = 0;
+    const blocked = await start();
+    try {
+      assert.equal(blocked.runtime.catalogManager.current().version, secondVersion);
+      assert.deepEqual(rollbackWarnings(), [{
+        type: 'runtime.catalog.rollback-blocked',
+        level: 'warn',
+        activeVersion: secondVersion,
+        shippedVersion: firstVersion,
+        message: 'Startup kept the active catalog because the shipped version was previously active. Set TICKETBOT_ALLOW_CATALOG_VERSION to the shipped version to allow this rollback.'
+      }]);
+    } finally {
+      await blocked.stop();
+    }
+
+    logs.length = 0;
+    const mismatchedOverride = await start({ TICKETBOT_ALLOW_CATALOG_VERSION: '2026.1.0-not-the-shipped-version' });
+    try {
+      assert.equal(mismatchedOverride.runtime.catalogManager.current().version, secondVersion);
+      assert.equal(rollbackWarnings().length, 1);
+    } finally {
+      await mismatchedOverride.stop();
+    }
+
+    logs.length = 0;
+    const allowed = await start({ TICKETBOT_ALLOW_CATALOG_VERSION: firstVersion });
+    try {
+      assert.equal(allowed.runtime.catalogManager.current().version, firstVersion);
+      assert(logs.some(line => line.includes('"type":"catalog.activated"')));
+      assert.deepEqual(rollbackWarnings(), []);
+    } finally {
+      await allowed.stop();
+    }
+
+    logs.length = 0;
+    const sameVersion = await start();
+    try {
+      assert.equal(sameVersion.runtime.catalogManager.current().version, firstVersion);
+      assert.deepEqual(rollbackWarnings(), []);
+      assert(!logs.some(line => line.includes('"type":"catalog.activated"')));
+    } finally {
+      await sameVersion.stop();
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

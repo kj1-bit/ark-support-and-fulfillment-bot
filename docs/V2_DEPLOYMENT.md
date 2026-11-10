@@ -61,3 +61,13 @@ Retention and cleanup are configured with the optional `retention` section and d
 The V2 runtime migration keeps the legacy V1 ticket table intact by renaming it to `tickets_v1_legacy` before creating the V2 `tickets` table; if that archive name is already occupied, migration fails and rolls back without changing ticket data. This preserves legacy ticket data but does not make V1 able to use the migrated database. Keep the pre-migration backup until the updated runtime and historical ticket data have been verified. A rollback to V1 must restore that backup before starting V1 because its handlers expect the original `tickets` table shape.
 
 The standalone V2 entrypoint is `node scripts/start-v2.js` or `npm run start:v2`. It reads `TICKETBOT_CONFIG_PATH` (or the default ignored local config), and starts the composed SQLite/Discord/RCON runtime. See the [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for an isolated test service example. The launcher has mock-mode startup coverage; it has not been rehearsed on Debian or against external test endpoints. Do not treat it as production-accepted.
+
+## Catalog startup and intentional rollback
+
+The launcher automatically activates a shipped catalog version that has never been active before. If the shipped version is already present as a retained catalog, startup keeps the current active catalog and writes a JSON warning to the normal startup log/journal:
+
+```json
+{"type":"runtime.catalog.rollback-blocked","level":"warn","activeVersion":"<active-version>","shippedVersion":"<shipped-version>","message":"Startup kept the active catalog because the shipped version was previously active. Set TICKETBOT_ALLOW_CATALOG_VERSION to the shipped version to allow this rollback."}
+```
+
+To deliberately restore that retained catalog, read the exact `shippedVersion` from the warning, set `TICKETBOT_ALLOW_CATALOG_VERSION` to that exact value in the service's operator-controlled environment, and restart once. Verify the startup log records `catalog.activated` with the expected version, then remove the override from the service environment and restart or reload its configuration. The override does not enable any other catalog version; if it does not exactly match the shipped version, the rollback remains blocked. No instance configuration schema or database migration is needed.

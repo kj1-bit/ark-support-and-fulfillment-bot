@@ -91,8 +91,20 @@ function createLauncherOptions(options = {}) {
           return backup;
         }
       });
-      // The persisted active catalog wins inside composeRuntime, so a newer shipped catalog must be activated explicitly.
-      if (runtime.catalogManager.current().version !== catalog.version) {
+      // Content-addressed versions have no ordering; never auto-activate a catalog that was active before.
+      const activeCatalog = runtime.catalogManager.current();
+      if (activeCatalog.version !== catalog.version) {
+        const isRollback = await runtime.catalogStore.isRetained(catalog.version);
+        if (isRollback && env.TICKETBOT_ALLOW_CATALOG_VERSION !== catalog.version) {
+          write(JSON.stringify({
+            type: 'runtime.catalog.rollback-blocked',
+            level: 'warn',
+            activeVersion: activeCatalog.version,
+            shippedVersion: catalog.version,
+            message: 'Startup kept the active catalog because the shipped version was previously active. Set TICKETBOT_ALLOW_CATALOG_VERSION to the shipped version to allow this rollback.'
+          }));
+          return runtime;
+        }
         await runtime.catalogManager.activate(await runtime.catalogManager.propose(catalog));
       }
       return runtime;

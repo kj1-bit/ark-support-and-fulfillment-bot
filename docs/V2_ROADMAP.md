@@ -309,15 +309,15 @@ Exit criteria:
 
 ## Phase 10: CI and release controls
 
-- [ ] Add syntax and static validation.
+- [ ] Add syntax and static validation. (Partial: CI validates the example configuration and runs the full Node test suite, which parses exercised modules; there is no dedicated lint or static-analysis step.)
 - [x] Add unit, integration, security, compatibility, and recovery tests. (CI runs the full suite plus the security, persistence, runtime, and hardening suites.)
 - [x] Add clean-install verification. (CI installs with `npm ci` on a clean runner.)
 - [ ] Add secret and private-value scanning. (Partial: CI rejects tracked `.env`, SQLite, runtime, backup, and log files; file contents are not scanned.)
-- [ ] Add dependency and install-script review.
-- [ ] Add catalog-schema validation and catalog-change reporting to CI.
-- [ ] Add protected-branch and pull-request controls.
+- [ ] Add dependency and install-script review. (Partial: CI uses the lockfile with `npm ci`, and `package.json` explicitly allows the `sqlite3` install script; CI does not run dependency vulnerability or dependency-change review.)
+- [ ] Add catalog-schema validation and catalog-change reporting to CI. (Partial: the launcher validates the shipped catalog and `scripts/test-dino-catalog-audit.js` audits it, but CI does not run a dedicated catalog validation or change-report step.)
+- [ ] Add protected-branch and pull-request controls. (Partial: CI runs for pull requests, but `main` has no branch protection/ruleset and is not included in the workflow's push branches.)
 - [ ] Produce reproducible release artifacts.
-- [ ] Create release and rollback checklists.
+- [x] Create release and rollback checklists. (The deployment and rollback sequences are documented in `docs/V2_DEPLOYMENT.md`, including the intentional catalog rollback procedure.)
 
 Exit criteria:
 

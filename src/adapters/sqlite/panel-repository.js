@@ -11,6 +11,12 @@ function createSqlitePanelRepository(database) {
         [panelKey]
       );
     },
+    async remove({ panelKey, channelId, messageId }) {
+      await database.run(
+        'DELETE FROM discord_panel_messages WHERE panel_key=? AND channel_id=? AND message_id=?',
+        [panelKey, channelId, messageId]
+      );
+    },
     async save({ panelKey, channelId, messageId, updatedAt }) {
       await database.run(
         `INSERT INTO discord_panel_messages (panel_key, channel_id, message_id, updated_at)

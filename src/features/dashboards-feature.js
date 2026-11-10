@@ -17,18 +17,21 @@ const PANEL_DEFINITIONS = Object.freeze([
 ]);
 
 function pagePayload(panel, page, result, pinsEnabled = false) {
-  const entries = result.results.filter(event => panel.key !== 'tickets'
-    || ['ticket.created','ticket.claimed','ticket.unclaimed','ticket.closed'].includes(event.type)).map(event => {
+  const entries = result.results.map(event => {
     const time = Math.floor(Number(event.occurredAt) / 1000);
     if (panel.key === 'tickets') {
-      const details = event.details;
       const mention = id => /^[1-9][0-9]{16,19}$/.test(String(id || '')) ? `<@${id}>` : 'Unknown';
-      const player = ticketPlayerName(details.playerName || details.player_name);
-      const requester = mention(details.actorId || details.actor_id);
-      if (event.type === 'ticket.created') return `${requester} (${player}) opened a ticket.`;
-      const moderator = mention(details.actionActorId || details.moderatorId || details.moderator_id);
-      const action = { 'ticket.claimed':'claimed','ticket.unclaimed':'unclaimed','ticket.closed':'closed' }[event.type];
-      return `${moderator} ${action} ${requester}'s (${player}) ticket.`;
+      const identity = event.identity;
+      const player = ticketPlayerName(identity.playerName || identity.player_name);
+      const requester = mention(identity.actorId || identity.actor_id);
+      const actor = details => mention(details.actionActorId || details.moderatorId || details.moderator_id);
+      const parts = [
+        [event.assignment,event.assignment?.type === 'ticket.unclaimed' ? 'unclaimed' : 'claimed'],
+        [event.reopened,'reopened'],[event.completed,'completed'],[event.closed,'closed']
+      ].filter(([action]) => action).sort(([first],[second]) => first.sequence - second.sequence)
+        .map(([action,verb]) => `${actor(action.details)} ${verb} the ticket`);
+      return [`${requester} (${player})${event.opened ? ' opened a ticket' : ': Opened (record expired)'}`,
+        ...parts].join(', ') + '.';
     }
     return `**${event.type}** · <t:${time}:R>\n${JSON.stringify(sanitizeDetails(event.details)).slice(0, 300)}`;
   });
@@ -107,6 +110,9 @@ function pinPagePayload(panel, result) {
 function createDashboardsFeature() {
   let listener;
   let pinsChangedListener;
+  let unsubscribeTickets;
+  let ticketRefreshTimer;
+  let active = false;
   const panels = [];
   return defineFeature({
     name:'dashboards',
@@ -135,6 +141,15 @@ function createDashboardsFeature() {
       }
     },
     async register(context) {
+      unsubscribeTickets = context.services.dashboards.subscribeTickets?.(() => {
+        if (!active || ticketRefreshTimer) return;
+        ticketRefreshTimer = setTimeout(() => {
+          ticketRefreshTimer = null;
+          const definition = panels.find(item => item.key === 'tickets');
+          if (definition) void definition.panel.refresh(context);
+        },150);
+        ticketRefreshTimer.unref?.();
+      });
       pinsChangedListener = () => {
         const definition = panels.find(item => item.key === 'pins' && item.directory);
         if (definition) {
@@ -196,8 +211,12 @@ function createDashboardsFeature() {
         await interaction.editReply(pagePayload(definition, page, result, context.config.features.pins));
       });
     },
-    async start(context) { await Promise.all(panels.map(item => item.panel.start(context))); },
+    async start(context) { active = true; await Promise.all(panels.map(item => item.panel.start(context))); },
     async stop(context) {
+      active = false;
+      if (ticketRefreshTimer) clearTimeout(ticketRefreshTimer);
+      ticketRefreshTimer = null;
+      if (unsubscribeTickets) unsubscribeTickets();
       if (listener) context.client.off('interactionCreate', listener);
       if (pinsChangedListener) context.client.off('v2VaultPinsChanged', pinsChangedListener);
       await Promise.all(panels.map(item => item.panel.stop(context)));

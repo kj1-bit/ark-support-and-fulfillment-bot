@@ -49,8 +49,14 @@ function createOperationalEventService({ repository, clock = Date.now }) {
   if (!repository || typeof repository.append !== 'function' || typeof repository.query !== 'function') {
     throw new TypeError('operational event repository interface is required.');
   }
+  const subscribers = new Set();
 
   return Object.freeze({
+    subscribe(listener) {
+      if (typeof listener !== 'function') throw new TypeError('Operational event listener is required.');
+      subscribers.add(listener);
+      return () => subscribers.delete(listener);
+    },
     async record(type, details = {}) {
       if (!ALLOWED_TYPES.includes(type)) {
         throw new TypeError('Unsupported operational event type.');
@@ -61,7 +67,9 @@ function createOperationalEventService({ repository, clock = Date.now }) {
         occurredAt: clock(),
         details: Object.freeze(sanitizeDetails(details))
       });
-      return repository.append(event);
+      const stored = await repository.append(event);
+      for (const listener of subscribers) listener(stored);
+      return stored;
     },
 
     async page(input = {}) {
@@ -70,6 +78,10 @@ function createOperationalEventService({ repository, clock = Date.now }) {
       const category = input.category === undefined ? null : String(input.category);
       if (category && !['ticket', 'pin', 'fulfillment', 'catalog'].includes(category)) {
         throw new TypeError('Unsupported dashboard category.');
+      }
+      if (input.ticketSummary === true) {
+        if (category !== 'ticket') throw new TypeError('Ticket summaries require the ticket category.');
+        return repository.ticketPage({ page,pageSize:Math.min(10,pageSize) });
       }
       const types = input.types;
       if (types !== undefined && (!Array.isArray(types) || !types.length

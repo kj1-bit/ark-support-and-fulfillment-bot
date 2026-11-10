@@ -13,10 +13,11 @@ function publicTicket(row) {
   };
 }
 
-function createSqliteTicketRepository(database) {
+function createSqliteTicketRepository(database, { mode } = {}) {
   if (!database || typeof database.run !== 'function' || typeof database.get !== 'function') {
     throw new TypeError('database run/get interface is required.');
   }
+  const mockMultiple = mode === 'mock' ? 1 : 0;
   const find = async id => publicTicket(await database.get('SELECT * FROM tickets WHERE id=?', [id]));
   return Object.freeze({
     get: find,
@@ -43,12 +44,12 @@ function createSqliteTicketRepository(database) {
         if (r.channelStatus) {
           result = await database.run(
             `INSERT INTO tickets
-             (id,type,description,actor_id,player_name,guild_id,channel_id,state,created_at,updated_at,source_channel_id,channel_status)
-             SELECT ?,?,?,?,?,?,?,?,?,?,?,?
-             WHERE NOT EXISTS (SELECT 1 FROM tickets WHERE guild_id=? AND actor_id=?
+             (id,type,description,actor_id,player_name,guild_id,channel_id,state,created_at,updated_at,source_channel_id,channel_status,mock_multiple)
+             SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
+             WHERE ?=1 OR NOT EXISTS (SELECT 1 FROM tickets WHERE guild_id=? AND actor_id=?
                AND channel_status IS NOT NULL AND state IN ('OPEN','CLAIMED'))`,
             [r.id,r.type,r.description,r.actorId,r.playerName,r.guildId,r.channelId,r.state,r.createdAt,r.updatedAt,
-              r.channelId,r.channelStatus,r.guildId,r.actorId]
+              r.channelId,r.channelStatus,mockMultiple,mockMultiple,r.guildId,r.actorId]
           );
           if (result.changes !== 1) throw new Error('An open ticket already exists for this player.');
         } else {
@@ -121,12 +122,13 @@ function createSqliteTicketRepository(database) {
       const states = fromStates.map(state => state === 'COMPLETED' ? 'CLAIMED' : state);
       const placeholders = states.map(() => '?').join(',');
       const result = await database.run(
-        `UPDATE tickets SET state=?,updated_at=?${toState === 'OPEN' ? ',completed_at=NULL,moderator_id=NULL' : ''}
+        `UPDATE tickets SET state=?,updated_at=?${toState === 'OPEN' ? ',completed_at=NULL,moderator_id=NULL,mock_multiple=?' : ''}
          WHERE id=? AND state IN (${placeholders})
-         ${toState === 'OPEN' ? `AND (channel_status IS NULL OR NOT EXISTS (
+         ${toState === 'OPEN' ? `AND (?=1 OR channel_status IS NULL OR NOT EXISTS (
            SELECT 1 FROM tickets AS other WHERE other.guild_id=tickets.guild_id AND other.actor_id=tickets.actor_id
            AND other.id<>tickets.id AND other.channel_status IS NOT NULL AND other.state IN ('OPEN','CLAIMED'))) ` : ''}`,
-        [toState,meta.updatedAt,id,...states]
+        [toState,meta.updatedAt,...(toState === 'OPEN' ? [mockMultiple] : []),id,...states,
+          ...(toState === 'OPEN' ? [mockMultiple] : [])]
       );
       if (result.changes !== 1) throw new Error('Ticket state changed concurrently or transition is invalid.');
       return find(id);

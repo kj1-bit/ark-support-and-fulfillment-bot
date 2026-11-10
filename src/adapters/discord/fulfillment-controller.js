@@ -35,6 +35,7 @@ function createFulfillmentController({ services, clock = Date.now }) {
       const context = toInteractionContext(interaction);
       services.authorization.authorize(input.linking ? 'player-names.verify' : 'fulfillment.confirm', context);
       return services.onlinePlayers.scanPage({ context, serverId: input.serverId, ttlMs: input.ttlMs,
+        serverIds: input.serverIds,
         includeUntrusted: input.linking === true, page: input.page || 1 });
     },
     async associate(interaction, input) {

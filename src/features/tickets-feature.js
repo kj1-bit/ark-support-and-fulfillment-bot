@@ -4,10 +4,12 @@ const { randomUUID } = require('node:crypto');
 const { ActionRowBuilder, ButtonStyle, ComponentType, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { defineFeature } = require('./feature-contract');
 const { toInteractionContext } = require('../adapters/discord/interaction-context');
-const { isButton, isModal, respond, safePublicRecord, ephemeral } = require('../adapters/discord/interaction-protocol');
-const { registerInteractionListener } = require('../adapters/discord/interaction-listener');
+const { isButton, isModal, respond, ephemeral } = require('../adapters/discord/interaction-protocol');
+const { registerInteractionListener, reportInteractionError } = require('../adapters/discord/interaction-listener');
 const { createPersistentPanel } = require('../adapters/discord/persistent-panel');
 const { createTicketChannelGateway } = require('../adapters/discord/ticket-channel-gateway');
+const { openTicketsPayload } = require('../adapters/discord/ticket-view');
+const { requirePrivateStaffChannel } = require('../adapters/discord/staff-pin-channel');
 const { requireStaffChannel } = require('./dashboards-feature');
 
 function requestPayload(shopEnabled) {
@@ -26,7 +28,7 @@ function requestPayload(shopEnabled) {
 
 function legacyPanelPayload() {
   return {
-    content:'**Legacy ticket management**\nManage preserved record-only tickets from earlier V2 releases. Enter the ticket ID from the ticket logs. No private channel will be created.',
+    content:'**Legacy ticket management**\nManage preserved record-only tickets from earlier V2 releases. Enter the ticket ID from the staff audit records. No private channel will be created.',
     components:[{ type:ComponentType.ActionRow, components:[{
       type:ComponentType.Button, custom_id:'v2:legacy-ticket:open',
       label:'Manage Legacy Ticket', style:ButtonStyle.Secondary
@@ -55,7 +57,22 @@ function createTicketsFeature() {
   let pendingRecovery;
   let panel;
   let legacyPanel;
+  let openPanel;
+  let openPage = 1;
+  let refreshTimer;
+  let unsubscribe;
+  let active = false;
+  let entries = new Map();
   const modals = new Map();
+
+  function scheduleOpenRefresh(context) {
+    if (!active || refreshTimer) return;
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      void openPanel.refresh(context);
+    }, 150);
+    refreshTimer.unref?.();
+  }
 
   async function showLegacy(context, interaction, ticketId, messageId) {
     const record = await context.services.tickets.getLegacy({ ticketId, context:toInteractionContext(interaction) });
@@ -82,6 +99,19 @@ function createTicketsFeature() {
         key:'legacy-tickets', channelId:context.config.discord.channels.ticketLogs,
         payload:legacyPanelPayload(), validateChannel:requireStaffChannel
       });
+      openPanel = createPersistentPanel({
+        key:'open-tickets',channelId:context.config.discord.channels.ticketLogs,
+        validateChannel:(channel, current) => requirePrivateStaffChannel(channel, current,
+          current.config.discord.channels.ticketLogs),sensitive:true,
+        unavailableContent:'Open Tickets unavailable. Staff must verify channel privacy.',
+        payload:async () => {
+          const result = await context.services.tickets.openSnapshot(openPage);
+          openPage = result.page;
+          const previous = new Map([...entries].map(([token, record]) => [record.id, token]));
+          entries = new Map(result.results.map(record => [previous.get(record.id) || randomUUID(), record]));
+          return openTicketsPayload({ ...result,results:[...entries].map(([unclaimToken, record]) => ({ ...record,unclaimToken })) });
+        }
+      });
       context.services.tickets.connectChannels(createTicketChannelGateway({
         client:context.client, config:context.config,
         onRenameError:error => context.logSink({ type:'discord.ticket.rename_failed', at:new Date().toISOString(),
@@ -89,7 +119,38 @@ function createTicketsFeature() {
       }));
     },
     async register(context) {
+      unsubscribe = context.services.tickets.subscribe(() => scheduleOpenRefresh(context));
       listener = registerInteractionListener(context, 'tickets', async interaction => {
+        const open = String(interaction.customId || '').match(/^v2:open-ticket:(unclaim|prev|next):([^:]+)$/);
+        if (open && isButton(interaction)) {
+          if (!openPanel.matches(interaction)) throw new Error('This Open Tickets panel is no longer valid.');
+          const bound = toInteractionContext(interaction, { requireMessage:true });
+          context.services.authorization.authorize('tickets.moderate', bound);
+          const unclaim = open[1] === 'unclaim';
+          if (unclaim) await interaction.deferReply({ flags:MessageFlags.Ephemeral });
+          else await interaction.deferUpdate();
+          try {
+            try {
+              const channel = await context.client.channels.fetch(context.config.discord.channels.ticketLogs, { force:true });
+              await requirePrivateStaffChannel(channel, context, context.config.discord.channels.ticketLogs);
+            } catch (error) {
+              await openPanel.refresh(context);
+              throw error;
+            }
+            if (unclaim) {
+              const record = entries.get(open[2]);
+              if (!record) return respond(interaction, ephemeral('This Open Tickets entry is no longer available.'));
+              const result = await context.services.tickets.unclaim({ ticketId:record.id,context:bound });
+              scheduleOpenRefresh(context);
+              return respond(interaction, ephemeral(result.notice));
+            }
+            const result = await context.services.tickets.openPage({ page:Number(open[2]),context:bound });
+            openPage = result.page;
+            return openPanel.refresh(context);
+          } catch (error) {
+            return reportInteractionError(context, 'tickets', interaction, error, !unclaim);
+          }
+        }
         if (isButton(interaction) && interaction.customId === 'v2:legacy-ticket:open') {
           if (!legacyPanel.matches(interaction)) throw new Error('This legacy ticket panel is no longer valid.');
           context.services.authorization.authorize('tickets.moderate', toInteractionContext(interaction));
@@ -100,7 +161,7 @@ function createTicketsFeature() {
           modals.set(id, { ...toInteractionContext(interaction), expiresAt:Date.now() + 120000 });
           return interaction.showModal(new ModalBuilder().setCustomId(`v2:legacy-ticket:lookup:${id}`)
             .setTitle('Manage Legacy Ticket').addComponents(new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('ticket-id').setLabel('Ticket ID from the logs')
+              new TextInputBuilder().setCustomId('ticket-id').setLabel('Ticket ID from staff audit records')
                 .setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(80).setRequired(true))));
         }
         const legacy = String(interaction.customId || '').match(/^v2:legacy-ticket:(lookup|claim|complete|close|reopen):([^:]+)$/);
@@ -146,14 +207,15 @@ function createTicketsFeature() {
         if (action === 'create' && result.channelStatus === 'ACTIVE') {
           return respond(interaction, ephemeral(`Ticket created: <#${result.channelId}>`));
         }
-        return respond(interaction, safePublicRecord(result,
+        return respond(interaction, ephemeral(
           action === 'close' ? 'Ticket closed. It remains staff-visible until automatic deletion.'
             : action === 'complete' ? 'Ticket marked completed. The channel remains open.'
               : action === 'claim' ? 'Ticket claimed.' : 'Ticket updated.'));
       });
     },
     async start(context) {
-      await Promise.all([panel.start(context), legacyPanel.start(context)]);
+      active = true;
+      await Promise.all([panel.start(context), legacyPanel.start(context), openPanel.start(context)]);
       readyListener = () => {
         if (!pendingRecovery) {
           pendingRecovery = context.services.tickets.recoverChannels().catch(async error => {
@@ -176,12 +238,17 @@ function createTicketsFeature() {
       if (context.client.isReady?.()) await readyListener();
     },
     async stop(context) {
+      active = false;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = null;
+      if (unsubscribe) unsubscribe();
       if (listener) context.client.off('interactionCreate', listener);
       if (readyListener) context.client.off('ready', readyListener);
       if (deleteListener) context.client.off('channelDelete', deleteListener);
       if (messageDeleteListener) context.client.off('messageDelete', messageDeleteListener);
       if (panel) await panel.stop(context);
       if (legacyPanel) await legacyPanel.stop(context);
+      if (openPanel) await openPanel.stop(context);
       if (pendingRecovery) await pendingRecovery;
       listener = null;
       readyListener = null;
@@ -189,6 +256,8 @@ function createTicketsFeature() {
       messageDeleteListener = null;
       panel = null;
       legacyPanel = null;
+      openPanel = null;
+      entries.clear();
       modals.clear();
     }
   });

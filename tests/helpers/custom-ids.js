@@ -19,6 +19,9 @@ function collectCustomIds(payload) {
 // Discord rejects a message whose components repeat a custom_id, even on disabled buttons (50035).
 function assertUniqueCustomIds(payload, label = 'payload') {
   const ids = collectCustomIds(payload);
+  for (const id of ids) {
+    assert(typeof id === 'string' && id.length > 0 && id.length <= 100, `${label} has an invalid custom_id length`);
+  }
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
   assert.deepEqual(duplicates, [], `${label} repeats custom_id values: ${duplicates.join(', ')}`);
   return ids;

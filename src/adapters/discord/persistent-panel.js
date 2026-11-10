@@ -2,7 +2,8 @@
 
 const { createPinPrivacyListeners } = require('./staff-pin-channel');
 
-function createPersistentPanel({ key, channelId, payload, validateChannel, sensitive = false, retryDelayMs = 30000 }) {
+function createPersistentPanel({ key, channelId, payload, validateChannel, sensitive = false, retryDelayMs = 30000,
+  unavailableContent = 'PIN dashboard unavailable. Staff must verify channel privacy and refresh the panel.' }) {
   let messageId = null;
   let readyListener;
   let deleteListener;
@@ -32,7 +33,7 @@ function createPersistentPanel({ key, channelId, payload, validateChannel, sensi
       const message = await channel.messages.fetch(saved.messageId);
       if (message.author?.id !== context.client.user?.id || !message.author?.id) return;
       await message.edit({
-        content: 'PIN dashboard unavailable. Staff must verify channel privacy and refresh the panel.',
+        content: unavailableContent,
         embeds: [], components: [], allowedMentions: { parse: [] }
       });
     } catch (error) {

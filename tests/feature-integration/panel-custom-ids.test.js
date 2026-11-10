@@ -7,6 +7,7 @@ const { pagePayload } = require('../../src/features/dashboards-feature');
 const { requestPayload, legacyPanelPayload, legacyTicketPayload } = require('../../src/features/tickets-feature');
 const { vaultPanelPayload } = require('../../src/features/pins-feature');
 const { ticketControls } = require('../../src/adapters/discord/ticket-channel-gateway');
+const { openTicketsPayload } = require('../../src/adapters/discord/ticket-view');
 const { fulfillmentPanelView, playerNamesPanelView } = require('../../src/adapters/discord/fulfillment-view');
 
 test('every standing panel and ticket control message uses unique custom_ids', () => {
@@ -14,6 +15,10 @@ test('every standing panel and ticket control message uses unique custom_ids', (
     'request panel (shop)':requestPayload(true),
     'request panel (no shop)':requestPayload(false),
     'legacy ticket panel':legacyPanelPayload(),
+    'empty open tickets':openTicketsPayload({ page:1,pageSize:5,total:0,results:[] }),
+    'paged open tickets':openTicketsPayload({ page:1,pageSize:5,total:6,
+      results:Array.from({ length:5 }, (_,i) => ({ actorId:'10000000000000001',playerName:'Survivor',
+        state:i ? 'OPEN' : 'CLAIMED',unclaimToken:`token-${i}` })) }),
     'legacy ticket controls':legacyTicketPayload({
       id:'TKT-legacy', state:'OPEN', type:'SUPPORT', playerName:'Survivor', description:'Original request'
     }, ['claim','complete','close'].map(action => ({ action, token:`token-${action}` }))),

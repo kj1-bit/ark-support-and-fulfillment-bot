@@ -3,6 +3,7 @@
 const ALLOWED_TYPES = Object.freeze([
   'ticket.created',
   'ticket.claimed',
+  'ticket.unclaimed',
   'ticket.completed',
   'ticket.channel_failed',
   'ticket.closed',
@@ -70,7 +71,12 @@ function createOperationalEventService({ repository, clock = Date.now }) {
       if (category && !['ticket', 'pin', 'fulfillment', 'catalog'].includes(category)) {
         throw new TypeError('Unsupported dashboard category.');
       }
-      return repository.query({ page, pageSize, category });
+      const types = input.types;
+      if (types !== undefined && (!Array.isArray(types) || !types.length
+        || types.some(type => !ALLOWED_TYPES.includes(type)))) {
+        throw new TypeError('Unsupported dashboard event types.');
+      }
+      return repository.query({ page, pageSize, category, ...(types ? { types } : {}) });
     }
   });
 }

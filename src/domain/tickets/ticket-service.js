@@ -9,7 +9,7 @@ function validateText(value) {
   return text;
 }
 
-function createTicketService({ repository, playerNames, authorization, interactionGuard, audit, clock = Date.now, uuid, channelConfig }) {
+function createTicketService({ repository, playerNames, authorization, interactionGuard, panels, audit, clock = Date.now, uuid, channelConfig }) {
   if (!repository || typeof repository.create !== 'function' || typeof repository.claim !== 'function'
     || typeof repository.transition !== 'function') throw new TypeError('ticket repository interface is required.');
   if (!playerNames || typeof playerNames.get !== 'function') throw new TypeError('playerNames.get is required.');
@@ -18,6 +18,16 @@ function createTicketService({ repository, playerNames, authorization, interacti
   if (typeof uuid !== 'function') throw new TypeError('uuid is required.');
   let gateway;
   const locks = new Map();
+  const subscribers = new Set();
+  const pendingUnclaimSync = new Set();
+  function changed() { for (const listener of subscribers) listener(); }
+
+  function openSnapshot(page = 1) {
+    if (!channelConfig || !Number.isSafeInteger(page) || page < 1) {
+      throw new Error('Invalid Open Tickets page.');
+    }
+    return repository.openPage(channelConfig.guildId, page);
+  }
 
   function exclusive(id, action) {
     const prior = locks.get(id) || Promise.resolve();
@@ -110,13 +120,60 @@ function createTicketService({ repository, playerNames, authorization, interacti
         { moderatorId:input.context.actorId, updatedAt:clock() });
     }
     const event = { claim:'claimed', complete:'completed', close:'closed', reopen:'reopened' }[action];
-    audit.write(`ticket.${event}`, record);
+    audit.write(`ticket.${event}`, { ...record, actionActorId:input.context.actorId });
+    changed();
     return action === 'close' || action === 'reopen'
       ? syncAudited(record, action === 'close' ? 'archive' : 'reopen') : sync(record);
   }
 
   return Object.freeze({
     connectChannels(value) { gateway = value; },
+    subscribe(listener) {
+      if (typeof listener !== 'function') throw new TypeError('Ticket change listener is required.');
+      subscribers.add(listener);
+      return () => subscribers.delete(listener);
+    },
+    // Lifecycle-only reader; the Discord adapter verifies the staff-only destination before publishing.
+    openSnapshot,
+    async openPage(input) {
+      authorizeLegacy(input.context);
+      return openSnapshot(input.page);
+    },
+    async unclaim(input) {
+      authorizeLegacy(input.context);
+      return exclusive(input.ticketId, async () => {
+        const bound = await panels?.get('open-tickets');
+        if (!input.context.messageId || !bound || bound.channelId !== channelConfig.channels.ticketLogs
+          || bound.messageId !== input.context.messageId) {
+          throw new Error('This Open Tickets panel is no longer valid.');
+        }
+        const record = await repository.get(input.ticketId);
+        if (!record || record.guildId !== input.context.guildId) throw new Error('Ticket not found.');
+        if (record.state === STATES.CLOSED) return { changed:false,notice:'This ticket is already closed.' };
+        const claimed = record.state === STATES.CLAIMED
+          || (record.state === STATES.COMPLETED && Boolean(record.moderatorId));
+        if (!claimed) {
+          if (pendingUnclaimSync.has(record.id)) {
+            await syncAudited(record, 'unclaim');
+            pendingUnclaimSync.delete(record.id);
+          }
+          return { changed:false,notice:'This ticket is already unclaimed.' };
+        }
+        await preflight(record);
+        if (!await repository.unclaim(record.id, record.moderatorId, clock())) {
+          return { changed:false,notice:'This ticket changed. Please try again.' };
+        }
+        const updated = await repository.get(record.id);
+        audit.write('ticket.unclaimed', {
+          ...updated,actionActorId:input.context.actorId,previousClaimantId:record.moderatorId
+        });
+        changed();
+        pendingUnclaimSync.add(record.id);
+        await syncAudited(updated, 'unclaim');
+        pendingUnclaimSync.delete(record.id);
+        return { changed:true,notice:'Ticket unclaimed.' };
+      });
+    },
     getLegacy,
     async legacyControls(input) {
       const record = await getLegacy(input);
@@ -124,7 +181,7 @@ function createTicketService({ repository, playerNames, authorization, interacti
         throw new Error('Message-bound legacy ticket controls are unavailable.');
       }
       const actions = record.state === STATES.CLOSED ? ['reopen']
-        : record.state === STATES.COMPLETED ? ['close']
+        : record.state === STATES.COMPLETED ? [...(!record.moderatorId ? ['claim'] : []),'close']
           : record.state === STATES.CLAIMED ? ['complete','close'] : ['claim','complete','close'];
       const controls = await Promise.all(actions.map(async action => {
         const session = await interactionGuard.issue({
@@ -178,17 +235,20 @@ function createTicketService({ repository, playerNames, authorization, interacti
           state:STATES.OPEN, createdAt:clock(), updatedAt:clock(),
           ...(channelConfig ? { channelStatus:'PROVISIONING' } : {})
         });
+        changed();
         if (channelConfig) {
           let channelId;
           try {
             channelId = await gateway.create(record, input.username);
           } catch (error) {
             await repository.failProvisioning(record.id, clock());
+            changed();
             audit.write('ticket.channel_failed', { id:record.id, phase:'create' });
             throw error;
           }
           try {
             record = await repository.attachChannel(record.id, channelId, clock());
+            changed();
           } catch (error) {
             audit.write('ticket.channel_failed', { id:record.id, phase:'persist', channelId });
             // The channel topic contains the reservation ID for startup recovery.
@@ -203,6 +263,7 @@ function createTicketService({ repository, playerNames, authorization, interacti
           }
         }
         audit.write('ticket.created', record);
+        changed();
         return record;
       });
     },
@@ -258,6 +319,7 @@ function createTicketService({ repository, playerNames, authorization, interacti
               const channelId = await gateway.find(record);
               if (!channelId) {
                 await repository.failProvisioning(record.id, clock());
+                changed();
                 audit.write('ticket.channel_failed', { id:record.id, phase:'interrupted' });
                 return;
               }
@@ -268,6 +330,7 @@ function createTicketService({ repository, playerNames, authorization, interacti
           } catch (error) {
             if (error.code === 10003 && record.channelStatus !== 'PROVISIONING') {
               await repository.markChannelDeleted(record.id, clock());
+              changed();
               audit.write('ticket.channel_failed', { id:record.id, phase:'missing', state:'CLOSED' });
               return;
             }
@@ -276,6 +339,7 @@ function createTicketService({ repository, playerNames, authorization, interacti
           }
         });
       }
+      changed();
       if (failures.length) throw new AggregateError(failures, 'Ticket channel recovery was incomplete.');
     },
     async channelDeleted(channelId, guildId) {
@@ -286,6 +350,7 @@ function createTicketService({ repository, playerNames, authorization, interacti
         const live = await repository.get(record.id);
         if (!live || live.channelStatus === 'DELETED') return;
         await repository.markChannelDeleted(record.id, clock());
+        changed();
         audit.write('ticket.channel_failed', { id:record.id, phase:'deleted', state:'CLOSED' });
       });
     },

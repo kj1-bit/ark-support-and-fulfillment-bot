@@ -35,7 +35,8 @@ function ticketControls(record) {
       type:ComponentType.Button, custom_id:`v2:ticket:reopen:${record.id}`,
       label:'Reopen Ticket', style:ButtonStyle.Secondary
     }] : [
-      ...(record.state === 'OPEN' ? [{ type:ComponentType.Button, custom_id:`v2:ticket:claim:${record.id}`,
+      ...(record.state === 'OPEN' || (record.state === 'COMPLETED' && !record.moderatorId)
+        ? [{ type:ComponentType.Button, custom_id:`v2:ticket:claim:${record.id}`,
         label:'Claim Ticket', style:ButtonStyle.Primary }] : []),
       { type:ComponentType.Button, custom_id:`v2:ticket:complete:${record.id}`,
         label:'Ticket Completed', style:ButtonStyle.Success, disabled:record.state === 'COMPLETED' },
@@ -98,8 +99,8 @@ function createTicketChannelGateway({ client, config, onRenameError = () => {} }
     return channel;
   }
   const payload = record => ({
-    content:record.state === 'CLOSED' ? `Ticket #${record.ticketNumber} is closed and archived. Staff may reopen it.`
-      : `<@${record.actorId}> <@&${discord.roles.staff}>\nTicket #${record.ticketNumber} has been opened. Please describe your request here.\n\n${DLC_NOTICE}`,
+    content:record.state === 'CLOSED' ? 'This ticket is closed and archived. Staff may reopen it.'
+      : `<@${record.actorId}> <@&${discord.roles.staff}>\nYour ticket is open. Please describe your request here.\n\n${DLC_NOTICE}`,
     components:ticketControls(record),
     allowedMentions:record.state === 'CLOSED' ? { parse:[] } : { users:[record.actorId], roles:[discord.roles.staff] }
   });
@@ -145,7 +146,7 @@ function createTicketChannelGateway({ client, config, onRenameError = () => {} }
         try { message = await channel.messages.fetch(record.messageId); }
         catch (error) { if (error.code !== 10008) throw error; }
         if (!message) replacementId = (await channel.send(payload(record))).id;
-        else await message.edit({ components:ticketControls(record), allowedMentions:{ parse:[] } });
+        else await message.edit({ ...payload(record), allowedMentions:{ parse:[] } });
       }
       scheduleRename(channel, desiredName(record, renames.get(channel.id)?.name || channel.name));
       return replacementId;

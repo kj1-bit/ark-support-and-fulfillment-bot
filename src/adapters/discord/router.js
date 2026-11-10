@@ -75,16 +75,18 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
     token => views.catalogView(result, token));
   }
   async function showPlayers(interaction, data) {
-    const result = controller.scanPage ? await controller.scanPage(interaction,
-      { serverId: data.serverId, ttlMs: FLOW_TTL_MS, linking: data.linking === true, page: data.playerPage || 1 })
-      : { players: await (data.linking ? controller.scanCandidates : controller.scan)(interaction,
-        { serverId: data.serverId, ttlMs: FLOW_TTL_MS }), page: 1, pageSize: 25 };
+    await interaction.editReply({ content:data.linking ? 'Scanning the selected map for online players...'
+      : 'Scanning enabled fulfillment maps for verified online players...', embeds:[],components:[] });
+    const result = await controller.scanPage(interaction,
+      { ...(data.linking ? { serverId: data.serverId } : { serverIds: allowedServers().map(server => server.id) }),
+        ttlMs: FLOW_TTL_MS, linking: data.linking === true, page: data.playerPage || 1 });
     const players = result.players;
     return render(interaction, { ...data, stage: 'players', playerPage: result.page,
-      playerTotal: result.total ?? players.length, playerRefs: players.map(player => player.playerRef) },
+      playerTotal: result.total ?? players.length, playerRefs: players.map(player => player.playerRef),
+      playerServers: Object.fromEntries(players.map(player => [player.playerRef, player.serverId])) },
       token => views.playerSelectionView({
-        content: data.linking ? 'Select the observed online identity for the selected Discord member.'
-          : 'Select a verified online player.',
+        content: players.length ? data.linking ? 'Select the observed online identity for the selected Discord member.'
+          : 'Select a verified online player.' : 'No eligible online players found.',
         customId: `v2:fulfillment:${data.linking ? 'link' : 'select'}:${token}`,
         players, token, linking: data.linking, showBack: data.wizard === true,
         page: result.page, total: result.total ?? players.length, pageSize: result.pageSize
@@ -170,7 +172,7 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
     if (action === 'online' && isButton(interaction) && flow.stage === 'creature') {
       flows.delete(token);
       await interaction.deferUpdate();
-      return showMaps(interaction, { ...flow, serverPage: 1 });
+      return showPlayers(interaction, { ...flow, playerPage: 1 });
     }
     if (action === 'member' && interaction.isUserSelectMenu?.() && flow.stage === 'member') {
       if (!/^[1-9][0-9]{16,19}$/.test(value || '')) throw new Error('Select a Discord member.');
@@ -204,7 +206,7 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
         return interaction.editReply({ content: `Verified trusted identity for ${linked.displayName}.`, components: [] });
       }
       const model = await controller.begin(interaction, {
-        serverId: flow.serverId, creatureId: flow.creatureId, playerRef: value,
+        serverId: flow.playerServers[value], creatureId: flow.creatureId, playerRef: value,
         ...(flow.catalogVersion ? { catalogVersion: flow.catalogVersion } : {}),
         ttlMs: FLOW_TTL_MS, idempotencyKey: uuid()
       });
@@ -223,7 +225,6 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
         if (isButton(interaction) && ['confirm', 'cancel'].includes(parsed.action) && handleFulfillment) {
           await interaction.deferUpdate();
           const result = await controller[parsed.action](interaction, parsed);
-          if (parsed.action === 'confirm') await logSink(controller.moderatorLog(result, interaction.logDetails || {}));
           return interaction.editReply(views.resultView(result));
         }
         if (!flows.has(parsed.token)) {
@@ -235,6 +236,8 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
         }
         return await handleFlow(interaction, parsed);
       } catch (error) {
+        await logSink({ type: 'discord.interaction.failed', at: new Date().toISOString(),
+          data: { feature: 'fulfillment', action: parseCustomId(interaction.customId)?.action || 'open' } });
         const payload = ephemeral(safeInteractionMessage(error));
         if (interaction.deferred || interaction.replied) return interaction.followUp(payload);
         return interaction.reply(payload);

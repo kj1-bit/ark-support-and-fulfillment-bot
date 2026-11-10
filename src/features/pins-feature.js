@@ -122,6 +122,7 @@ function createPinsFeature() {
                 return true;
               }
             });
+            context.client.emit('v2VaultPinsChanged');
             return respond(interaction, ephemeral(result.created
               ? 'Your Vault PIN was created and sent to your direct messages.'
               : 'Your Vault PIN was sent to your direct messages.'));
@@ -138,8 +139,9 @@ function createPinsFeature() {
           await interaction.deferReply({ flags: MessageFlags.Ephemeral });
           const memberIds = await eligibleMemberIds(context, interaction, pinContext.guildId);
           const summary = await context.services.vaultPins.generateMissing({ context: pinContext, memberIds });
+          context.client.emit('v2VaultPinsChanged');
           const lines = [
-            'Vault PIN generation complete. Refresh the PIN directory to view new codes. Members receive theirs from the Vault panel.',
+            'Vault PIN generation complete. Use Reveal PINs Privately in the directory to view codes. Members receive theirs from the Vault panel.',
             `Eligible members: ${summary.eligible}`, `Generated: ${summary.created}`, `Already had a PIN: ${summary.existing}`,
             `Skipped (player name not verified): ${summary.unverified}`, `Failed: ${summary.failed}`
           ];

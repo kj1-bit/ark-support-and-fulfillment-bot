@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { createDashboardsFeature, requireStaffChannel } = require('../../src/features/dashboards-feature');
+const { createDashboardsFeature, pagePayload, requireStaffChannel } = require('../../src/features/dashboards-feature');
 const { createOperationalEventService } = require('../../src/domain/dashboards/operational-event-service');
 const { createDashboardService } = require('../../src/domain/dashboards/dashboard-service');
 const { assertUniqueCustomIds } = require('../helpers/custom-ids');
@@ -43,7 +43,8 @@ async function setup(t) {
   }));
   client.channels = { fetch:async key => channels.get(key) };
   const page = (key,n) => ({ page:n,pageSize:1,total:2,
-    results:[{ type:`${key === 'tickets' ? 'ticket' : key}.event`,occurredAt:1000,details:{ id:'record-1',pin:'1234' } }] });
+    results:[{ type:key === 'tickets' ? 'ticket.created' : `${key}.event`,occurredAt:1000,
+      details:{ id:'record-1',actorId:id(6),playerName:'Survivor',pin:'1234' } }] });
   const context = { client,config,logSink:async event => errors.push(event),services:{
     authorization:{ authorize:() => { if (deny) throw new Error('Denied'); } },
     dashboardPanels:{ get:async key => saved.get(key),save:async row => saved.set(row.panelKey,row) },
@@ -70,7 +71,8 @@ test('standing dashboards restore, edit in place, and recreate deleted messages 
   assert.equal(s.sent.length,3);
   for (const message of s.sent) assertUniqueCustomIds(message.payload,message.payload.embeds[0].title);
   assert.equal(s.saved.size,3);
-  assert.match(s.sent[0].payload.embeds[0].description,/record-1/);
+  assert.match(s.sent[0].payload.embeds[0].description,/Survivor.*opened a ticket/);
+  assert(!s.sent[0].payload.embeds[0].description.includes('record-1'));
   assert(!JSON.stringify(s.sent).includes('1234'));
   await s.emit('ready');
   assert.equal(s.sent.length,3);
@@ -97,8 +99,8 @@ test('authorized paging updates the bound standing message, with refresh and mis
     assert.equal(body.flags,undefined);
     assert.match(body.embeds[0].title,/page 2/);
     assert.deepEqual(body.components[0].components.slice(0,3).map(button => button.label),
-      ['Previous',key === 'pins' ? 'Refresh' : 'Refresh Logs','Next']);
-    if (key === 'pins') assert.equal(body.components[0].components[4].label,'Generate Missing PINs');
+      key === 'pins' ? ['Previous','Next','Reveal PINs Privately'] : ['Previous','Refresh Logs','Next']);
+    if (key === 'pins') assert.equal(body.components[0].components[3].label,'Generate Missing PINs');
   }
 });
 
@@ -162,6 +164,7 @@ function pinInteraction(s, action = 'directory-refresh', extra = {}) {
     customId:`v2:dashboard:pins:${action}:1`,isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId:id(4),
     channel:s.channels.get(id(4)),message:{ id:s.saved.get('pins').messageId },member:{ roleIds:[id(2)] },replies:[],
     deferUpdate:async () => { click.deferred = true; },
+    deferReply:async body => { click.deferred = true; click.deferPayload = body; },
     editReply:async body => { click.body = body; }, reply:async body => click.replies.push(body),
     followUp:async body => click.replies.push(body),
     ...extra
@@ -173,18 +176,22 @@ function currentPinMessage(s) {
   return s.sent.find(message => message.id === s.saved.get('pins').messageId);
 }
 
-test('PIN directory refresh, activity toggle, restart and deleted panels preserve only the current binding', async t => {
+test('PIN directory hides codes, reveals only privately, retires activity, and preserves restart/deletion binding', async t => {
   const s = await setup(t);
   const pin = currentPinMessage(s);
   assert.match(pin.payload.embeds[0].description,/Survivor/);
-  assert.match(pin.payload.embeds[0].description,/5820/);
+  assert(!JSON.stringify(pin.payload).includes('5820'));
   const refreshed = pinInteraction(s);
   await s.emit('interactionCreate',refreshed);
-  assert.match(refreshed.body.embeds[0].description,/5820/);
+  assert(!JSON.stringify(refreshed.body).includes('5820'));
+  const reveal = pinInteraction(s,'directory-reveal');
+  await s.emit('interactionCreate',reveal);
+  assert.equal(reveal.deferPayload.flags,64);
+  assert.match(reveal.body.content,/\|\|5820\|\|/);
+  assert(!JSON.stringify(pin.payload).includes('5820'));
   const activity = pinInteraction(s,'activity-refresh');
   await s.emit('interactionCreate',activity);
-  assert(!JSON.stringify(activity.body).includes('5820'));
-  assert.match(activity.body.embeds[0].description,/pins.event/);
+  assert.equal(activity.body,undefined);
   await s.feature.stop(s.context);
   const restarted = createDashboardsFeature();
   await restarted.initialize(s.context);
@@ -192,16 +199,64 @@ test('PIN directory refresh, activity toggle, restart and deleted panels preserv
   await restarted.start(s.context);
   t.after(() => restarted.stop(s.context));
   assert.equal(s.sent.length,3);
-  assert.match(pin.payload.embeds[0].description,/5820/);
+  assert(!JSON.stringify(pin.payload).includes('5820'));
   pin.remove();
   await s.emit('messageDelete',pin);
   assert.equal(s.sent.length,4);
   const replacement = s.sent[3];
-  assert.match(replacement.payload.embeds[0].description,/5820/);
+  assert(!JSON.stringify(replacement.payload).includes('5820'));
   const stale = pinInteraction(s,'directory-refresh',{ message:{ id:pin.id } });
   await s.emit('interactionCreate',stale);
   assert.equal(stale.body,undefined);
   assert.equal(stale.replies[0].flags,64);
+});
+
+test('private PIN reveal rejects unauthorized, unsafe and stale requests without exposing codes', async t => {
+  const s = await setup(t);
+  for (const extra of [{ guildId:id(20) },{ channelId:id(3) },{ message:{ id:'stale' } }]) {
+    const click = pinInteraction(s,'directory-reveal',extra);
+    await s.emit('interactionCreate',click);
+    assert.equal(click.body,undefined);
+    assert(!JSON.stringify(click.replies).includes('5820'));
+  }
+  s.channels.get(id(4)).permissionsFor = () => ({ has:() => true });
+  const unsafe = pinInteraction(s,'directory-reveal');
+  await s.emit('interactionCreate',unsafe);
+  assert.equal(unsafe.body,undefined);
+  assert(!JSON.stringify(unsafe.replies).includes('5820'));
+  s.deny();
+  const denied = pinInteraction(s,'directory-reveal');
+  await s.emit('interactionCreate',denied);
+  assert.equal(denied.body,undefined);
+  assert(!JSON.stringify(denied.replies).includes('5820'));
+});
+
+test('ticket logs show only requester/player, claimant and closer, accepting historical SQLite fields', () => {
+  const details = { actor_id:id(6),player_name:'Survivor',moderator_id:id(7),
+    id:'TKT-hidden',description:'unnecessary detail',state:'CLOSED',channel_id:'hidden-channel' };
+  const body = pagePayload({ key:'tickets',title:'Ticket logs' },1,{ pageSize:10,total:5,
+    results:['created','claimed','unclaimed','completed','channel_failed','closed'].map(type => ({
+      type:`ticket.${type}`,occurredAt:1000,details:{ ...details,...(type === 'closed' ? { actionActorId:id(8) } : {}) }
+    })) });
+  const text = body.embeds[0].description;
+  assert(text.includes(`<@${id(6)}> (Survivor) opened a ticket.`));
+  assert(text.includes(`<@${id(7)}> claimed`));
+  assert(text.includes(`<@${id(7)}> unclaimed`));
+  assert(text.includes(`<@${id(8)}> closed`));
+  for (const hidden of ['TKT-hidden','unnecessary','hidden-channel','CLOSED','{','ticket.completed','channel_failed']) {
+    assert(!text.includes(hidden));
+  }
+});
+
+test('PIN changes refresh the existing directory with no activity tab or plaintext codes', async t => {
+  const s = await setup(t);
+  s.context.services.pinDirectoryRestoration.page = async () => ({
+    page:1,pageSize:10,total:1,results:[{ userId:id(7),playerName:'New Survivor',pin:'6782' }]
+  });
+  await s.emit('v2VaultPinsChanged');
+  assert.equal(s.sent.length,3);
+  assert.match(currentPinMessage(s).payload.embeds[0].description,/New Survivor/);
+  assert(!JSON.stringify(currentPinMessage(s).payload).includes('6782'));
 });
 
 test('permission changes redact bound PIN content and never call decryption in an unsafe channel', async t => {
@@ -226,7 +281,7 @@ test('permission changes redact bound PIN content and never call decryption in a
     { id:id(2),guild:channel.guild,permissions:{ has:() => false } },
     { id:id(2),guild:channel.guild,permissions:{ has:() => true } });
   assert.equal(pin.payload.content,null);
-  assert.match(pin.payload.embeds[0].description,/5820/);
+  assert(!JSON.stringify(pin.payload).includes('5820'));
 });
 
 test('paging checks fresh member-overwrite privacy before reads and clears a previously readable panel', async t => {
@@ -322,7 +377,7 @@ test('a configured PIN channel move redacts the old bound message before restori
   t.after(() => restarted.stop(s.context));
   assert.deepEqual(old.payload.embeds,[]);
   assert.equal(s.saved.get('pins').channelId,id(8));
-  assert.match(currentPinMessage(s).payload.embeds[0].description,/5820/);
+  assert(!JSON.stringify(currentPinMessage(s).payload).includes('5820'));
 });
 
 test('permission failures redact the known binding even when the panel repository is unavailable', async t => {

@@ -64,6 +64,8 @@ Keep `ticketLogs`, `pinsDashboard`, and `fulfillmentLogs` staff-only. Inline das
 
 When tickets are enabled, `ticketLogs` also hosts the **Manage Legacy Ticket** panel for preserved record-only requests. It uses the same staff-only privacy checks even with dashboards disabled. Staff enter a ticket ID and manage its original state through private, message-bound controls; no additional configuration or private channels are needed.
 
+The same tickets feature also restores a separate **Open Tickets** panel in `ticketLogs`, independently of `features.dashboards`. It lists nonclosed private and legacy tickets in SQL pages of five with numbered Unclaim buttons; completed-but-not-closed tickets remain visible. No new channel, role, setting or migration is required. Fresh role/member-overwrite privacy checks protect publication and actions; unsafe or unverifiable destinations redact the panel. Unclaim additionally checks staff authorization, configured guild/log channel and the current persisted panel message, replies privately and records the acting staff member and previous claimant. Ticket changes refresh the existing message with a 150 ms debounce. See [ticket runtime](V2_TICKET_RUNTIME.md#open-tickets-and-unclaim).
+
 With `pins` enabled, turn on **Server Members Intent** in the test application's Developer Portal. The launcher requests Guild Members only for that feature so **Generate Missing PINs** can enumerate eligible members. This does not grant PINs to unverified users or reveal them publicly.
 
 ## Important distinction

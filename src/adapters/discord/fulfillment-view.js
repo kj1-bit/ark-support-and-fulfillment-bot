@@ -67,7 +67,8 @@ function playerSelectionView({ content, customId, players, token, linking, page,
   return { content: `${content}${page ? ` — Page ${page}` : ''}`, components: [
     ...(players.length ? [row([select(customId, 'Select an online player',
       players.slice(0, 25).map(player => ({ label: safeText(player.displayName),
-        value: player.playerRef, description: player.trusted ? 'Verified identity' : 'Unverified observation' })))])] : []),
+        value: player.playerRef, description: safeText(player.trusted
+          ? `Verified identity - ${player.serverId || 'Online'}` : 'Unverified observation') })))])] : []),
     ...(token ? [row([
       ...(page ? pageControls(token, page, total, pageSize) : []),
       ...(linking || !showBack ? [button(route('close', token), 'Cancel')] : navigation(token))
@@ -82,7 +83,7 @@ function confirmationView(model) {
     button(route('cancel', model.token), 'Cancel')])] };
 }
 function resultView(result) {
-  return { content: `Fulfillment status: ${result.state}`, components: [] };
+  return { content: `Fulfillment status: ${result.state}`, components: [], embeds: [] };
 }
 module.exports = { confirmationView, playerSelectionView, resultView, fulfillmentPanelView,
   playerNamesPanelView, catalogSearchModal, catalogView, creatureView, serverSelectionView, memberSelectionView };

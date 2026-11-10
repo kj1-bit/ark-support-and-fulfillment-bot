@@ -31,7 +31,7 @@ function setup(linking = false) {
   const scans = [], pending = [], sessions = [], associations = [], capabilities = [];
   let nextRef = 0;
   const onlinePlayers = createOnlinePlayerSelectionService({ players,
-    ark: { listOnlinePlayers: async serverId => { scans.push(serverId); return observations; } },
+    ark: { listOnlinePlayers: async serverId => { scans.push(serverId); return serverId === 'map-26' ? observations : []; } },
     uuid: () => `observed-reference-${++nextRef}` });
   const catalog = { version: 'current', creatures: [{ id: 'rex', name: 'Rex', enabled: true, tameable: true }],
     get: id => { assert.equal(id, 'rex'); return catalog.creatures[0]; } };
@@ -64,15 +64,10 @@ async function openMaps(state, linking = false) {
 async function next(state, view) {
   return state.router.handle(interaction('button', component(view, 'Next').custom_id));
 }
-test('26th enabled map and trusted online player are reachable and issue review on exact private message', async () => {
+test('cross-map scan reaches the 26th map and pages trusted players without a map-selection step', async () => {
   const state = setup();
-  const firstMaps = await openMaps(state);
-  assert.equal(component(firstMaps, 'Select a map').options.length, 25);
-  assert.equal(component(firstMaps, 'Previous').disabled, true);
-  const secondMaps = await next(state, firstMaps);
-  assert.deepEqual(component(secondMaps, 'Select a map').options.map(option => option.value), ['map-26']);
-  assert.equal(component(secondMaps, 'Next').disabled, true);
-  const firstPlayers = await state.router.handle(interaction('select', component(secondMaps, 'Select a map').custom_id, ['map-26']));
+  const firstPlayers = await openMaps(state);
+  assert.equal(component(firstPlayers, 'Select a map'), undefined);
   assert.equal(component(firstPlayers, 'Select an online player').options.length, 25);
   const secondPlayers = await next(state, firstPlayers);
   const menu = component(secondPlayers, 'Select an online player');
@@ -89,7 +84,8 @@ test('26th enabled map and trusted online player are reachable and issue review 
   assert.equal(state.sessions[0].messageId, privateId);
   assert.equal(state.sessions[0].guildId, guildId);
   assert.equal(state.sessions[0].channelId, channelId);
-  assert.deepEqual(state.scans, ['map-26', 'map-26']);
+  assert.deepEqual(state.scans, [...Array.from({ length:26 }, (_,i) => `map-${i+1}`),
+    ...Array.from({ length:26 }, (_,i) => `map-${i+1}`)]);
 });
 test('26th staff linking candidate on 26th map associates selected Discord member using observed trusted ref', async () => {
   const state = setup(true);
@@ -108,24 +104,15 @@ test('26th staff linking candidate on 26th map associates selected Discord membe
     { actorId, guildId, channelId }, { allowUntrusted: true }), /no longer available/);
   assert(state.capabilities.every(capability => capability === 'player-names.verify'));
 });
-test('map and online-player paging remain actor/guild/channel/message-bound and selections are restricted to displayed page', async () => {
+test('cross-map online-player paging remains actor/guild/channel/message-bound and restricted to displayed refs', async () => {
   const state = setup();
-  const maps = await openMaps(state);
-  for (const overrides of [{ user: { id: targetId } }, { guildId: targetId }, { channelId: targetId },
-    { message: { id: panelId } }]) {
-    const denied = await state.router.handle(interaction('button', component(maps, 'Next').custom_id, [], overrides));
-    assert.equal(denied.flags, 64);
-  }
-  const secondMaps = await next(state, maps);
-  const mapMenu = component(secondMaps, 'Select a map');
-  assert.equal((await state.router.handle(interaction('select', mapMenu.custom_id, ['map-1']))).flags, 64);
-  const players = await state.router.handle(interaction('select', mapMenu.custom_id, ['map-26']));
+  const players = await openMaps(state);
   const oldRef = component(players, 'Select an online player').options[0].value;
   for (const overrides of [{ user: { id: targetId } }, { guildId: targetId }, { channelId: targetId },
     { message: { id: panelId } }]) {
     assert.equal((await state.router.handle(interaction('button', component(players, 'Next').custom_id, [], overrides))).flags, 64);
   }
-  assert.equal(state.scans.length, 1);
+  assert.equal(state.scans.length, 26);
   const secondPlayers = await next(state, players);
   const menu = component(secondPlayers, 'Select an online player');
   assert.equal((await state.router.handle(interaction('select', menu.custom_id, [oldRef]))).flags, 64);
@@ -137,14 +124,45 @@ test('map and online-player paging remain actor/guild/channel/message-bound and 
 test('online scanPage preserves legacy first-page scan and clamps pages after changing online population', async () => {
   const state = setup();
   const context = { actorId, guildId, channelId };
-  assert.equal((await state.onlinePlayers.scan({ context, serverId: 'map-1' })).length, 25);
-  const second = await state.onlinePlayers.scanPage({ context, serverId: 'map-1', page: 2 });
+  assert.equal((await state.onlinePlayers.scan({ context, serverId: 'map-26' })).length, 25);
+  const second = await state.onlinePlayers.scanPage({ context, serverId: 'map-26', page: 2 });
   assert.equal(second.total, 26);
   assert.equal(second.page, 2);
   assert.equal(second.players.length, 1);
   state.observations.splice(20);
-  const clamped = await state.onlinePlayers.scanPage({ context, serverId: 'map-1', page: 2 });
+  const clamped = await state.onlinePlayers.scanPage({ context, serverId: 'map-26', page: 2 });
   assert.equal(clamped.page, 1);
   assert.equal(clamped.total, 20);
   await assert.rejects(state.onlinePlayers.scanPage({ context, serverId: 'map-1', page: 0 }), /page is invalid/);
+});
+
+test('cross-map refs retain server identity for identical names, exclude unverified players, and revalidate only their map', async () => {
+  const eosId = 'a'.repeat(32);
+  const players = createPlayerRegistry([{ eosId,discordId:targetId,displayName:'Same Name',verified:true }]);
+  const scans = [];
+  let now = 0, fail = false, moved = false;
+  const online = createOnlinePlayerSelectionService({ players,clock:() => now,
+    ark:{ listOnlinePlayers:async serverId => {
+      scans.push(serverId);
+      now += 1000;
+      if (fail && serverId === 'map-two') throw new Error('scan unavailable');
+      return [{ eosId:moved ? 'c'.repeat(32) : eosId,displayName:'Same Name' },
+        { eosId:'b'.repeat(32),displayName:'Untrusted' }];
+    } } });
+  const context = { actorId,guildId,channelId };
+  const result = await online.scanPage({ context,serverIds:['map-one','map-two'],ttlMs:100 });
+  assert.equal(result.total,2);
+  assert.deepEqual(result.players.map(player => player.serverId),['map-one','map-two']);
+  const selected = result.players[1];
+  assert.equal(online.resolve(selected.playerRef,context).serverId,'map-two');
+  assert.equal(selected.expiresAt,2100);
+  scans.length = 0;
+  assert.equal((await online.revalidate({ playerRef:selected.playerRef,serverId:'map-two',eosId })).online,true);
+  assert.deepEqual(scans,['map-two']);
+  const refreshed = await online.scanPage({ context,serverIds:['map-one'],ttlMs:100 });
+  moved = true;
+  assert.equal((await online.revalidate({ playerRef:refreshed.players[0].playerRef,serverId:'map-one',eosId })).online,false);
+  fail = true;
+  await assert.rejects(online.scanPage({ context,serverIds:['map-one','map-two'] }),/scan unavailable/);
+  assert.equal((await online.scanPage({ context,serverIds:[] })).total,0);
 });

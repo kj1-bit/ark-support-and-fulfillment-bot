@@ -90,6 +90,7 @@ function makeAdapter(overrides = {}) {
     },
     tickets: {
       connectChannels() {},
+      subscribe:() => () => {},
       recoverChannels: async () => {},
       create: ticketResult('create'),
       claim: ticketResult('claim'),
@@ -167,11 +168,13 @@ test('ticket channel buttons claim, complete, close and reopen through the bound
   await adapter.stop();
 });
 
-test('ticket controls offer Claim only while a ticket is open and keep unique custom IDs', () => {
+test('ticket controls offer Claim for unclaimed active tickets, preserve completion and keep unique custom IDs', () => {
   const labels = state => ticketControls({ id: 'TKT-1', state })[0].components.map(component => component.label);
   assert.deepEqual(labels('OPEN'), ['Claim Ticket', 'Ticket Completed', 'Close Ticket']);
   assert.deepEqual(labels('CLAIMED'), ['Ticket Completed', 'Close Ticket']);
-  assert.deepEqual(labels('COMPLETED'), ['Ticket Completed', 'Close Ticket']);
+  assert.deepEqual(labels('COMPLETED'), ['Claim Ticket', 'Ticket Completed', 'Close Ticket']);
+  assert.deepEqual(ticketControls({ id:'TKT-1',state:'COMPLETED',moderatorId:'10000000000000005' })[0]
+    .components.map(button => button.label), ['Ticket Completed','Close Ticket']);
   assert.deepEqual(labels('CLOSED'), ['Reopen Ticket']);
   for (const state of ['OPEN', 'CLAIMED', 'COMPLETED', 'CLOSED']) {
     assertUniqueCustomIds({ components: ticketControls({ id: 'TKT-1', state }) });

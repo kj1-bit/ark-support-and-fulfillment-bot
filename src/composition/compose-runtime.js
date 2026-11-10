@@ -163,7 +163,7 @@ async function composeRuntime(options = {}) {
     if (event.type === 'fulfillment.completed') {
       return event.data?.state === 'SUCCEEDED' ? 'fulfillment.succeeded' : 'fulfillment.failed';
     }
-    if (event.type === 'fulfillment.uncertain') return 'fulfillment.failed';
+    if (event.type === 'fulfillment.uncertain' || event.type === 'fulfillment.expired') return 'fulfillment.failed';
     if (event.type === 'fulfillment.canceled') return 'fulfillment.canceled';
     return null;
   };
@@ -234,6 +234,7 @@ async function composeRuntime(options = {}) {
     playerNames,
     authorization,
     interactionGuard,
+    panels:dashboardPanels,
     audit,
     clock,
     uuid: randomUUID,

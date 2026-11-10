@@ -43,7 +43,9 @@ async function setup(t) {
   }));
   client.channels = { fetch:async key => channels.get(key) };
   const page = (key,n) => ({ page:n,pageSize:1,total:2,
-    results:[{ type:key === 'tickets' ? 'ticket.created' : `${key}.event`,occurredAt:1000,
+    results:[key === 'tickets' ? {
+      id:'record-1',occurredAt:1000,opened:{},identity:{ actorId:id(6),playerName:'Survivor' }
+    } : { type:`${key}.event`,occurredAt:1000,
       details:{ id:'record-1',actorId:id(6),playerName:'Survivor',pin:'1234' } }] });
   const context = { client,config,logSink:async event => errors.push(event),services:{
     authorization:{ authorize:() => { if (deny) throw new Error('Denied'); } },
@@ -231,18 +233,16 @@ test('private PIN reveal rejects unauthorized, unsafe and stale requests without
   assert(!JSON.stringify(denied.replies).includes('5820'));
 });
 
-test('ticket logs show only requester/player, claimant and closer, accepting historical SQLite fields', () => {
+test('ticket summaries are single comma-separated lines with action actors and historical SQLite identity fields', () => {
   const details = { actor_id:id(6),player_name:'Survivor',moderator_id:id(7),
     id:'TKT-hidden',description:'unnecessary detail',state:'CLOSED',channel_id:'hidden-channel' };
-  const body = pagePayload({ key:'tickets',title:'Ticket logs' },1,{ pageSize:10,total:5,
-    results:['created','claimed','unclaimed','completed','channel_failed','closed'].map(type => ({
-      type:`ticket.${type}`,occurredAt:1000,details:{ ...details,...(type === 'closed' ? { actionActorId:id(8) } : {}) }
-    })) });
+  const body = pagePayload({ key:'tickets',title:'Ticket logs' },1,{ pageSize:10,total:1,
+    results:[{ identity:details,opened:details,
+      assignment:{ type:'ticket.unclaimed',sequence:2,details },
+      completed:{ sequence:3,details:{ ...details,actionActorId:id(9) } },
+      closed:{ sequence:4,details:{ ...details,actionActorId:id(8) } } }] });
   const text = body.embeds[0].description;
-  assert(text.includes(`<@${id(6)}> (Survivor) opened a ticket.`));
-  assert(text.includes(`<@${id(7)}> claimed`));
-  assert(text.includes(`<@${id(7)}> unclaimed`));
-  assert(text.includes(`<@${id(8)}> closed`));
+  assert.equal(text,`<@${id(6)}> (Survivor) opened a ticket, <@${id(7)}> unclaimed the ticket, <@${id(9)}> completed the ticket, <@${id(8)}> closed the ticket.`);
   for (const hidden of ['TKT-hidden','unnecessary','hidden-channel','CLOSED','{','ticket.completed','channel_failed']) {
     assert(!text.includes(hidden));
   }

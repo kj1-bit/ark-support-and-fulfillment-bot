@@ -6,6 +6,7 @@ const { randomUUID } = require('node:crypto');
 const { openSqliteDatabase } = require('../../src/adapters/sqlite/open-database');
 const migration004 = require('../../src/migrations/004-tickets');
 const migration012 = require('../../src/migrations/012-ticket-channels');
+const migration014 = require('../../src/migrations/014-mock-ticket-multiplicity');
 const { createSqliteTicketRepository } = require('../../src/adapters/sqlite/ticket-repository');
 const { createSqliteRetentionRepository } = require('../../src/adapters/sqlite/retention-repository');
 const { createTicketService } = require('../../src/domain/tickets/ticket-service');
@@ -23,6 +24,7 @@ async function setup(t) {
   t.after(() => db.close());
   await migration004.up(db);
   for (const sql of migration012.statements) await db.executeSql(sql);
+  for (const sql of migration014.statements) await db.executeSql(sql);
   const repository = createSqliteTicketRepository(db);
   const policy = createAuthorizationPolicy({ guildId:config.guildId, capabilities:{
     'tickets.moderate':{ roleIds:[id(2)],channelIds:[id(3),id(4)] },

@@ -10,8 +10,6 @@ const { openSqliteDatabase } = require('../../src/adapters/sqlite/open-database'
 const { createMigrationRunner } = require('../../src/migrations/migration-runner');
 const { createSqliteTicketRepository } = require('../../src/adapters/sqlite/ticket-repository');
 const { createSqlitePanelRepository } = require('../../src/adapters/sqlite/panel-repository');
-const { createSqliteSessionRepository } = require('../../src/adapters/sqlite/session-repository');
-const { createSessionStore } = require('../../src/domain/sessions/session-store');
 const { createTicketService } = require('../../src/domain/tickets/ticket-service');
 const { createAuthorizationPolicy, authorize } = require('../../src/security/authorization');
 const { createTicketsFeature } = require('../../src/features/tickets-feature');
@@ -24,10 +22,10 @@ const discord = { guildId:id(1),roles:{ staff:id(2) },
 const staff = { actorId:id(7),guildId:id(1),channelId:id(4),roleIds:[id(2)] };
 const migrationNames = ['v2-core','trusted-state','player-names','tickets','pins','operational-events',
   'fulfillment-targets','trusted-identity-associations','discord-panels','fulfillment-result-redaction',
-  'schema-integrity','ticket-channels','vault-pins'];
+  'schema-integrity','ticket-channels','vault-pins','mock-ticket-multiplicity'];
 const buttons = body => body.components.flatMap(row => row.components);
 
-async function setup(t, { publicLogs = false } = {}) {
+async function setup(t, { publicLogs = false, retiredPanel, ready = true } = {}) {
   const database = await openSqliteDatabase(':memory:');
   await createMigrationRunner({ database,migrations:migrationNames.map((name,index) =>
     require(`../../src/migrations/${String(index + 1).padStart(3,'0')}-${name}`)) }).run();
@@ -37,7 +35,7 @@ async function setup(t, { publicLogs = false } = {}) {
   let publicChannel = publicLogs, nextId = 100, requester = 20, now = 1000, failSync = false;
   const client = new EventEmitter();
   client.user = { id:id(90) };
-  client.isReady = () => true;
+  client.isReady = () => ready;
   const roles = new Map([id(1),id(2)].map(roleId => [roleId,{ id:roleId,permissions:{ has:() => false } }]));
   const members = new Map();
   const guild = { id:id(1),roles:{ cache:roles,fetch:async () => roles },
@@ -88,12 +86,48 @@ async function setup(t, { publicLogs = false } = {}) {
   const authorization = { authorize:(capability,context) => authorize(policy,capability,context) };
   const tickets = createTicketService({
     repository,panels,authorization,channelConfig:discord,uuid:randomUUID,clock:() => now++,
-    interactionGuard:createSessionStore({ repository:createSqliteSessionRepository(database),clock:() => now++ }),
     playerNames:{ get:async () => ({ status:'VERIFIED',playerName:'Mud' }) },
     audit:{ write:(type,data) => audit.push({ type,data }) }
   });
   const context = { client,config:{ discord,features:{ tickets:true,shop:false,dashboards:false } },
     services:{ tickets,authorization,dashboardPanels:panels },logSink:async event => logs.push(event) };
+  let retiredMessage;
+  let cleanupFailure = retiredPanel?.failure;
+  if (retiredPanel) {
+    const channelId = retiredPanel.channelId || id(4);
+    await panels.save({ panelKey:'legacy-tickets',channelId,messageId:id(2000),updatedAt:1 });
+    const target = channels.get(channelId);
+    retiredMessage = {
+      id:id(2000),channelId,guildId:id(1),author:client.user,deleted:0,
+      ...retiredPanel.message,
+      delete:async () => {
+        if (cleanupFailure === 'delete') throw Object.assign(new Error('private deletion details'),{ code:50013 });
+        if (cleanupFailure === 'delete-missing') {
+          target.messageStore.delete(id(2000));
+          throw Object.assign(new Error('Unknown Message'),{ code:10008 });
+        }
+        retiredMessage.deleted += 1;
+        target.messageStore.delete(id(2000));
+      }
+    };
+    if (!retiredPanel.missing) target.messageStore.set(retiredMessage.id,retiredMessage);
+    if (retiredPanel.guildId) target.guildId = retiredPanel.guildId;
+    const fetch = client.channels.fetch;
+    client.channels.fetch = async (...args) => {
+      if (cleanupFailure === 'channel' && args[0] === channelId) throw new Error('private fetch details');
+      if (cleanupFailure === 'channel-unavailable' && args[0] === channelId) return undefined;
+      return fetch(...args);
+    };
+    const fetchMessage = target.messages.fetch;
+    target.messages.fetch = async key => {
+      if (cleanupFailure === 'message' && key === id(2000)) throw new Error('private message fetch details');
+      if (cleanupFailure === 'message-unavailable' && key === id(2000)) return undefined;
+      return fetchMessage(key);
+    };
+    if (retiredPanel.forgetFailure) {
+      context.services.dashboardPanels = { ...panels,remove:async () => { throw new Error('private persistence details'); } };
+    }
+  }
   let feature = createTicketsFeature();
   async function start() {
     await feature.initialize(context);
@@ -136,7 +170,8 @@ async function setup(t, { publicLogs = false } = {}) {
   }
   return {
     database,repository,panels,tickets,context,client,channels,audit,logs,sent,current,create,ticketContext,unclaimInput,
-    emit,click,interaction,settle:() => delay(230),
+    emit,click,interaction,settle:() => delay(230),retiredMessage,
+    cleanupFailure:value => { cleanupFailure = value; },
     failSync:value => { failSync = value; },publicLogs:value => { publicChannel = value; },
     addNonstaffMember:() => {
       memberViewers.add(id(80));
@@ -154,7 +189,8 @@ test('Open Tickets is a separate persistent staff panel even with dashboards dis
   assert.equal(empty.body.embeds[0].title,'Open Tickets');
   assert.equal(empty.body.embeds[0].description,'No open tickets.');
   assert.deepEqual(empty.body.components,[]);
-  assert(await s.panels.get('legacy-tickets'));
+  assert.equal(await s.panels.get('legacy-tickets'),undefined);
+  assert.equal(s.sent.length,2,'only Requests and Open Tickets are posted with dashboards disabled');
   const record = await s.create();
   await s.settle();
   const message = await s.current();
@@ -356,32 +392,122 @@ test('claim/unclaim races serialize consistently and the atomic repository guard
   assert.deepEqual(repeats.map(result => result.changed),[true,false]);
 });
 
-test('legacy assignments unclaim without creating a channel and legacy actions refresh the same panel', async t => {
+test('historical assignments still appear and unclaim without recreating removed legacy controls or channels', async t => {
   const s = await setup(t);
   const legacy = await s.repository.create({
     id:'legacy-open',actorId:id(70),playerName:'Old Mud',guildId:id(1),channelId:id(3),
     state:'OPEN',type:'SUPPORT',description:'Original request',createdAt:100,updatedAt:100
   });
-  const privateContext = { ...staff,messageId:id(2000) };
-  async function legacyAction(action) {
-    const view = await s.tickets.legacyControls({ ticketId:legacy.id,context:privateContext });
-    const control = view.controls.find(control => control.action === action);
-    return s.tickets.legacyAction({ action,token:control.token,context:privateContext });
-  }
   const count = s.channels.size;
-  await legacyAction('claim');
-  await s.settle();
+  await s.repository.claim(legacy.id,id(7),101);
+  await s.emit('ready');
   assert.match((await s.current()).body.embeds[0].description,/Claimed - <@\d+>\nLegacy ticket - no channel/);
   await s.tickets.unclaim(await s.unclaimInput(legacy));
   await s.settle();
   assert.match((await s.current()).body.embeds[0].description,/Unclaimed\nLegacy ticket - no channel/);
-  await legacyAction('complete');
-  await s.settle();
-  assert.match((await s.current()).body.embeds[0].description,/Completed - Unclaimed/);
-  await legacyAction('close');
-  await s.settle();
-  assert.equal((await s.current()).body.embeds[0].description,'No open tickets.');
+  assert.equal((await s.repository.get(legacy.id)).description,'Original request');
+  for (const action of ['claim','complete','close','reopen']) {
+    await assert.rejects(s.tickets[action]({ ticketId:legacy.id,context:staff }),/no ticket-channel controls/);
+  }
+  for (const method of ['getLegacy','legacyControls','legacyAction']) assert.equal(s.tickets[method],undefined);
+  assert.equal(await s.panels.get('legacy-tickets'),undefined);
   assert.equal(s.channels.size,count);
+});
+
+test('startup removes only the persisted bot-owned legacy panel and never recreates it on deletion or restart', async t => {
+  const s = await setup(t,{ retiredPanel:{} });
+  assert.equal(s.retiredMessage.deleted,1);
+  assert.equal(await s.panels.get('legacy-tickets'),undefined);
+  assert.equal(s.sent.length,2);
+  assert.equal((await s.current()).body.embeds[0].title,'Open Tickets');
+  await s.emit('messageDelete',s.retiredMessage);
+  await s.emit('ready');
+  await s.restart();
+  assert.equal(s.retiredMessage.deleted,1);
+  assert.equal(s.sent.length,2);
+  assert(!s.logs.some(event => event.type === 'discord.ticket.legacy_panel_cleanup_failed'));
+});
+
+test('startup before Discord readiness defers cleanup and never posts a replacement legacy panel', async t => {
+  const s = await setup(t,{ retiredPanel:{},ready:false });
+  assert.equal(s.retiredMessage.deleted,0);
+  assert(await s.panels.get('legacy-tickets'));
+  assert.equal(s.sent.length,0);
+  s.client.isReady = () => true;
+  await s.emit('ready');
+  assert.equal(s.retiredMessage.deleted,1);
+  assert.equal(await s.panels.get('legacy-tickets'),undefined);
+  assert.equal(s.sent.length,2);
+  assert.equal((await s.current()).body.embeds[0].title,'Open Tickets');
+});
+
+test('already missing legacy messages, including deletion races, clear only the retired binding', async t => {
+  for (const retiredPanel of [{ missing:true },{ failure:'delete-missing' }]) {
+    const s = await setup(t,{ retiredPanel });
+    assert.equal(await s.panels.get('legacy-tickets'),undefined);
+    assert(await s.panels.get('open-tickets'));
+    assert(await s.panels.get('requests'));
+    assert(!s.logs.some(event => event.type === 'discord.ticket.legacy_panel_cleanup_failed'));
+  }
+});
+
+test('foreign channel/guild and unowned or unverifiable legacy messages are never deleted or edited', async t => {
+  for (const [retiredPanel,phase] of [
+    [{ channelId:id(3) },'channel'],
+    [{ guildId:id(9) },'channel'],
+    [{ message:{ author:{ id:id(91) } } },'ownership'],
+    [{ message:{ author:undefined } },'ownership'],
+    [{ message:{ channelId:id(3) } },'ownership'],
+    [{ message:{ guildId:id(9) } },'ownership']
+  ]) {
+    const s = await setup(t,{ retiredPanel });
+    assert.equal(s.retiredMessage.deleted,0);
+    assert(await s.panels.get('legacy-tickets'));
+    const failure = s.logs.find(event => event.type === 'discord.ticket.legacy_panel_cleanup_failed');
+    assert.deepEqual(failure.data,{ phase });
+    assert.equal(s.retiredMessage.body,undefined);
+  }
+});
+
+test('legacy cleanup fetch/delete/persistence failures are explicit, preserve binding and retry on readiness', async t => {
+  for (const failure of ['channel','channel-unavailable','message','message-unavailable','delete','forget']) {
+    const phase = failure.split('-')[0];
+    const s = await setup(t,{ retiredPanel:phase === 'forget' ? { forgetFailure:true } : { failure } });
+    assert(await s.panels.get('legacy-tickets'));
+    assert(s.logs.some(event => event.type === 'discord.ticket.legacy_panel_cleanup_failed' && event.data.phase === phase));
+    assert(!JSON.stringify(s.logs).includes('private'));
+    s.cleanupFailure(null);
+    s.context.services.dashboardPanels = s.panels;
+    await s.emit('ready');
+    assert.equal(await s.panels.get('legacy-tickets'),undefined);
+    assert.equal(s.retiredMessage.deleted,1);
+    assert.equal((await s.current()).body.embeds[0].title,'Open Tickets');
+  }
+});
+
+test('old legacy buttons and lookup/action tokens only receive a private retirement reply, never record details or actions', async t => {
+  const s = await setup(t);
+  await s.repository.create({ id:'old-ticket',actorId:id(20),playerName:'Old Mud',guildId:id(1),
+    channelId:id(3),state:'OPEN',type:'SUPPORT',description:'Original request',createdAt:100,updatedAt:100 });
+  const before = await s.database.all('SELECT * FROM tickets');
+  await s.database.run(
+    `INSERT INTO interaction_sessions
+     (token,feature,actor_id,guild_id,channel_id,message_id,action,request_id,state,version,created_at,expires_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ['old-token','legacy-tickets',id(7),id(1),id(4),id(9),'close','old-ticket','ACTIVE',1,1,9999999999999]);
+  for (const action of ['open','lookup:old-token','claim:old-token','complete:old-token','close:old-token','reopen:old-token']) {
+    const item = s.interaction(`v2:legacy-ticket:${action}`,{
+      isButton:() => !action.startsWith('lookup'),isModalSubmit:() => action.startsWith('lookup'),
+      showModal:async () => assert.fail('must not open a modal'),
+      fields:{ getTextInputValue:() => assert.fail('must not read ticket lookups') }
+    });
+    await s.emit('interactionCreate',item);
+    assert.equal(item.replies[0].flags,64);
+    assert.equal(item.replies[0].content,'Legacy ticket management has been removed. Use Open Tickets for current assignments.');
+  }
+  assert.deepEqual(await s.database.all('SELECT * FROM tickets'),before);
+  assert.equal((await s.database.get('SELECT state FROM interaction_sessions WHERE token=?',['old-token'])).state,'ACTIVE');
+  assert.deepEqual(s.audit,[]);
 });
 
 test('a failed unclaim sync is audited and retryable without repeating its state transition', async t => {

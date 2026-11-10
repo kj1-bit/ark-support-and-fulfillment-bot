@@ -43,6 +43,7 @@ const migration010 = require('../migrations/010-fulfillment-result-redaction');
 const migration011 = require('../migrations/011-schema-integrity');
 const migration012 = require('../migrations/012-ticket-channels');
 const migration013 = require('../migrations/013-vault-pins');
+const migration014 = require('../migrations/014-mock-ticket-multiplicity');
 const { checkIntegrity } = require('../recovery/database-recovery');
 
 function buildAuthorizationOptions(config) {
@@ -138,7 +139,7 @@ async function composeRuntime(options = {}) {
     database,
     migrations: [
       migration001, migration002, migration003, migration004, migration005,
-      migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013
+      migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014
     ],
     clock
   }).run();
@@ -183,6 +184,7 @@ async function composeRuntime(options = {}) {
   });
   const dashboardsBase = createDashboardService({ events: operationalEvents });
   const dashboards = Object.freeze({
+    subscribeTickets:dashboardsBase.subscribeTickets,
     // Startup rendering has no human actor; the Discord adapter verifies staff-only visibility.
     snapshot(key, page) {
       if (!['tickets','pins','fulfillment'].includes(key)) throw new TypeError('Unsupported dashboard panel.');
@@ -228,16 +230,16 @@ async function composeRuntime(options = {}) {
       return basePlayerNames.verify(input);
     }
   });
-  const ticketRepository = createSqliteTicketRepository(database);
+  const ticketRepository = createSqliteTicketRepository(database, { mode:config.runtime?.mode });
   const tickets = createTicketService({
     repository: ticketRepository,
     playerNames,
     authorization,
-    interactionGuard,
     panels:dashboardPanels,
     audit,
     clock,
     uuid: randomUUID,
+    runtimeMode:config.runtime?.mode,
     channelConfig:config.features.tickets ? config.discord : null
   });
   const pinRepository = createSqlitePinRepository(database);

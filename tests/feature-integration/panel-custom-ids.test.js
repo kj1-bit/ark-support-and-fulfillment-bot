@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { assertUniqueCustomIds } = require('../helpers/custom-ids');
 const { pagePayload } = require('../../src/features/dashboards-feature');
-const { requestPayload, legacyPanelPayload, legacyTicketPayload } = require('../../src/features/tickets-feature');
+const { requestPayload } = require('../../src/features/tickets-feature');
 const { vaultPanelPayload } = require('../../src/features/pins-feature');
 const { ticketControls } = require('../../src/adapters/discord/ticket-channel-gateway');
 const { openTicketsPayload } = require('../../src/adapters/discord/ticket-view');
@@ -14,14 +14,10 @@ test('every standing panel and ticket control message uses unique custom_ids', (
   const payloads = {
     'request panel (shop)':requestPayload(true),
     'request panel (no shop)':requestPayload(false),
-    'legacy ticket panel':legacyPanelPayload(),
     'empty open tickets':openTicketsPayload({ page:1,pageSize:5,total:0,results:[] }),
     'paged open tickets':openTicketsPayload({ page:1,pageSize:5,total:6,
       results:Array.from({ length:5 }, (_,i) => ({ actorId:'10000000000000001',playerName:'Survivor',
         state:i ? 'OPEN' : 'CLAIMED',unclaimToken:`token-${i}` })) }),
-    'legacy ticket controls':legacyTicketPayload({
-      id:'TKT-legacy', state:'OPEN', type:'SUPPORT', playerName:'Survivor', description:'Original request'
-    }, ['claim','complete','close'].map(action => ({ action, token:`token-${action}` }))),
     'vault panel':vaultPanelPayload(),
     'ticket controls (open)':{ components:ticketControls({ id:'TKT-1',state:'OPEN' }) },
     'ticket controls (completed)':{ components:ticketControls({ id:'TKT-1',state:'COMPLETED' }) },
@@ -33,7 +29,7 @@ test('every standing panel and ticket control message uses unique custom_ids', (
 });
 
 test('log panel paging keeps Previous, Refresh, and Next distinct on every page boundary', () => {
-  const event = { type:'ticket.created',occurredAt:1000,details:{ id:'TKT-1' } };
+  const event = { type:'ticket.created',occurredAt:1000,details:{ id:'TKT-1' },identity:{},opened:{} };
   const cases = [
     ['empty log',1,{ results:[],total:0,pageSize:10 }],
     ['single page',1,{ results:[event],total:1,pageSize:10 }],

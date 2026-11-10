@@ -95,20 +95,20 @@ test('real SQLite catalog changes expire the review with a failure log before ex
   assert.equal((await s.runtime.dashboards.snapshot('fulfillment',1)).results[0].type,'fulfillment.failed');
 });
 
-test('ticket dashboard SQL filters counts and pages without deleting full audit history', async t => {
+test('ticket dashboard groups lifecycle events without deleting full audit history', async t => {
   const s = await setup(t);
   for (const type of ['ticket.created','ticket.claimed','ticket.unclaimed','ticket.closed','ticket.completed','ticket.channel_failed']) {
     await s.runtime.operationalEvents.record(type,{
-      actorId:id(9),playerName:'Player',actionActorId:id(1),previousClaimantId:id(10)
+      id:'ticket-one',actorId:id(9),playerName:'Player',actionActorId:id(1),previousClaimantId:id(10)
     });
   }
   const page = await s.runtime.dashboards.tickets({ context:{ ...actor,channelId:id(7) },pageSize:2,page:1 });
-  assert.equal(page.total,4);
-  assert.equal(page.results.length,2);
-  assert(page.results.every(event => ['ticket.created','ticket.claimed','ticket.unclaimed','ticket.closed'].includes(event.type)));
+  assert.equal(page.total,1);
+  assert.equal(page.results.length,1);
   const last = await s.runtime.dashboards.tickets({ context:{ ...actor,channelId:id(7) },pageSize:2,page:2 });
-  assert.equal(last.results.length,2);
-  const release = [...page.results,...last.results].find(event => event.type === 'ticket.unclaimed');
+  assert.equal(last.results.length,0);
+  const release = page.results[0].assignment;
+  assert.equal(release.type,'ticket.unclaimed');
   assert.equal(release.details.actionActorId,id(1));
   assert.equal(release.details.previousClaimantId,id(10));
   assert.equal((await s.runtime.operationalEvents.page({ category:'ticket' })).total,6);

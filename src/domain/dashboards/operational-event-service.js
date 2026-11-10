@@ -83,6 +83,13 @@ function createOperationalEventService({ repository, clock = Date.now }) {
         if (category !== 'ticket') throw new TypeError('Ticket summaries require the ticket category.');
         return repository.ticketPage({ page,pageSize:Math.min(10,pageSize) });
       }
+      if (input.fulfillmentSummary === true) {
+        if (category !== 'fulfillment') throw new TypeError('Fulfillment summaries require the fulfillment category.');
+        if (typeof repository.fulfillmentPage !== 'function') {
+          throw new TypeError('Operational event repository fulfillmentPage is required.');
+        }
+        return repository.fulfillmentPage({ page,pageSize:Math.min(10,pageSize) });
+      }
       const types = input.types;
       if (types !== undefined && (!Array.isArray(types) || !types.length
         || types.some(type => !ALLOWED_TYPES.includes(type)))) {

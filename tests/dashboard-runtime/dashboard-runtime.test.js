@@ -248,6 +248,46 @@ test('ticket summaries are single comma-separated lines with action actors and h
   }
 });
 
+test('fulfillment logs render only concise escaped summaries for every terminal outcome', () => {
+  const at = 1_800_000_000_000;
+  const body = pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',
+    creatures:new Map([['achatina',{ name:'Achatina' }]]) },1,{ pageSize:10,total:6,
+    results:[
+      { type:'fulfillment.succeeded',state:'SUCCEEDED',actorId:id(7),creatureId:'achatina',
+        playerName:'Mud',occurredAt:at },
+      { type:'fulfillment.failed',state:'FAILED',actorId:id(7),creatureId:'achatina',
+        playerName:'Mud',occurredAt:at },
+      { type:'fulfillment.failed',state:'PARTIAL',actorId:id(7),creatureId:'achatina',
+        playerName:'Mud',occurredAt:at },
+      { type:'fulfillment.failed',state:'UNCERTAIN',actorId:id(7),creatureId:'achatina',
+        playerName:'Mud',occurredAt:at },
+      { type:'fulfillment.failed',state:'EXPIRED',actorId:id(7),creatureId:'achatina',
+        playerName:'Mud',occurredAt:at },
+      { type:'fulfillment.canceled',state:'CANCELED',actorId:id(7),creatureId:'achatina',
+        playerName:'Mud',occurredAt:at }
+    ] });
+  assert.equal(body.embeds[0].title,'Dino Fulfillment Logs · page 1');
+  assert.equal(body.embeds[0].description,[
+    `<@${id(7)}> spawned Achatina for Mud · <t:1800000000:R>`,
+    `<@${id(7)}>'s Achatina spawn for Mud failed · <t:1800000000:R>`,
+    `<@${id(7)}>'s Achatina spawn for Mud partially succeeded · <t:1800000000:R>`,
+    `<@${id(7)}>'s Achatina spawn for Mud outcome is uncertain · <t:1800000000:R>`,
+    `<@${id(7)}>'s Achatina spawn for Mud expired before completion · <t:1800000000:R>`,
+    `<@${id(7)}> canceled Achatina for Mud · <t:1800000000:R>`
+  ].join('\n\n'));
+  assert.deepEqual(body.allowedMentions,{ parse:[] });
+  assert.deepEqual(body.components[0].components.map(button => button.label),['Previous','Refresh Logs','Next']);
+
+  const hostile = pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs' },1,{ pageSize:10,total:1,
+    results:[{ type:'fulfillment.failed',occurredAt:at,actorId:'bad-id',creatureId:'*creature*',
+      playerName:'@everyone\nspoof',details:{ id:'FUL-hidden',eosId:'secret' } }] });
+  assert.equal(hostile.embeds[0].description,
+    "Unknown staff's \\*creature\\* spawn for @​everyone spoof failed · <t:1800000000:R>");
+  for (const hidden of ['FUL-hidden','secret','fulfillment.failed','{']) {
+    assert(!hostile.embeds[0].description.includes(hidden));
+  }
+});
+
 test('PIN changes refresh the existing directory with no activity tab or plaintext codes', async t => {
   const s = await setup(t);
   s.context.services.pinDirectoryRestoration.page = async () => ({

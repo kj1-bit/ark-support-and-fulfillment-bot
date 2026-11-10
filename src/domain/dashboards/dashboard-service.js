@@ -8,7 +8,7 @@ function createDashboardService({ events }) {
     }),
     tickets:input => events.page({ ...input,category:'ticket',ticketSummary:true }),
     pins:input => events.page({ ...input,category:'pin' }),
-    fulfillment:input => events.page({ ...input,category:'fulfillment' }),
+    fulfillment:input => events.page({ ...input,category:'fulfillment',fulfillmentSummary:true }),
     catalog:input => events.page({ ...input,category:'catalog' }),
     all:input => events.page(input)
   });

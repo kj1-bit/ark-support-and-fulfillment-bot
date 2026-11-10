@@ -15,10 +15,39 @@ const TICKET_HISTORY = `WITH history AS (
   FROM history GROUP BY ticket_key
 )`;
 
+const FULFILLMENT_REQUEST = `COALESCE(
+  json_extract(operational_events.details_json,'$.requestId'),
+  json_extract(operational_events.details_json,'$.request_id'),
+  json_extract(operational_events.details_json,'$.id')
+)`;
+
 function createSqliteOperationalEventRepository(database) {
   if (!database || typeof database.run !== 'function' || typeof database.all !== 'function'
     || typeof database.get !== 'function') throw new TypeError('database run/all/get interface is required.');
   return Object.freeze({
+    async fulfillmentPage({ page, pageSize }) {
+      const count = await database.get(
+        "SELECT COUNT(*) AS total FROM operational_events WHERE category='fulfillment'");
+      const rows = await database.all(
+        `SELECT operational_events.type,operational_events.occurred_at AS occurredAt,
+          COALESCE(request.actor_id,json_extract(operational_events.details_json,'$.actorId'),
+            json_extract(operational_events.details_json,'$.actor_id')) AS actorId,
+          COALESCE(request.creature_id,json_extract(operational_events.details_json,'$.creatureId'),
+            json_extract(operational_events.details_json,'$.creature_id')) AS creatureId,
+          COALESCE(request.player_name,json_extract(operational_events.details_json,'$.playerName'),
+            json_extract(operational_events.details_json,'$.player_name')) AS playerName,
+          COALESCE(request.state,json_extract(operational_events.details_json,'$.state')) AS state
+        FROM operational_events
+        LEFT JOIN fulfillment_requests AS request ON request.id=${FULFILLMENT_REQUEST}
+        WHERE operational_events.category='fulfillment'
+        ORDER BY operational_events.occurred_at DESC,operational_events.id DESC LIMIT ? OFFSET ?`,
+        [pageSize,(page - 1) * pageSize]);
+      return Object.freeze({ page,pageSize,total:Number(count.total),
+        results:Object.freeze(rows.map(row => Object.freeze({
+          type:row.type,occurredAt:row.occurredAt,actorId:row.actorId,
+          creatureId:row.creatureId,playerName:row.playerName,state:row.state
+        }))) });
+    },
     async ticketPage({ page, pageSize }) {
       const count = await database.get(`${TICKET_HISTORY} SELECT COUNT(*) AS total FROM grouped`);
       const rows = await database.all(`${TICKET_HISTORY}, selected AS (

@@ -1,6 +1,6 @@
 'use strict';
 
-const { ButtonStyle, ChannelType, ComponentType, PermissionFlagsBits } = require('discord.js');
+const { ButtonStyle, ChannelType, ComponentType, OverwriteType, PermissionFlagsBits } = require('discord.js');
 const DLC_NOTICE = '**DLC notice:** If your request involves a DLC creature, confirm that you own the required DLC. Delivery does not guarantee access to DLC-restricted abilities.';
 const ACCESS = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory];
 // Manage Roles is Discord's "Manage Permissions" for channel overwrites; it is required but cannot be granted by an overwrite.
@@ -52,10 +52,11 @@ function createTicketChannelGateway({ client, config, onRenameError = () => {} }
   const renames = new Map();
   function overwrites(record) {
     return [
-      { id:discord.guildId, deny:[PermissionFlagsBits.ViewChannel] },
-      { id:discord.roles.staff, allow:ACCESS },
-      { id:client.user.id, allow:[...ACCESS,PermissionFlagsBits.ManageChannels] },
-      { id:record.actorId, ...(record.state === 'CLOSED' ? { deny:[PermissionFlagsBits.ViewChannel] } : { allow:ACCESS }) }
+      { id:discord.guildId, type:OverwriteType.Role, deny:[PermissionFlagsBits.ViewChannel] },
+      { id:discord.roles.staff, type:OverwriteType.Role, allow:ACCESS },
+      { id:client.user.id, type:OverwriteType.Member, allow:[...ACCESS,PermissionFlagsBits.ManageChannels] },
+      { id:record.actorId, type:OverwriteType.Member,
+        ...(record.state === 'CLOSED' ? { deny:[PermissionFlagsBits.ViewChannel] } : { allow:ACCESS }) }
     ];
   }
   function desiredName(record, current) {

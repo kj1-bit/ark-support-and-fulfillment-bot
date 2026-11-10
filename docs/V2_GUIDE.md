@@ -52,7 +52,7 @@ Configure only the features you intend to test. Enabled features have required r
 | `pins` | `roles.staff`, `channels.vault`, `channels.pinsDashboard` | Requires `playerNames` and `PIN_PROTECTION_KEY` in every launcher mode. Enable Server Members Intent for bulk generation. |
 | `shop` | `channels.requests` | Uses the active catalog/search service; restores a search-only panel if tickets are disabled. |
 | `fulfillment` | `roles.fulfillmentModerator`, `channels.fulfillment`, `channels.fulfillmentLogs` | Requires at least one enabled server and its RCON credential outside mock mode. |
-| `dashboards` | `roles.staff`, `channels.ticketLogs`, `channels.pinsDashboard`, `channels.fulfillmentLogs` | A dashboard renders only events produced by the enabled operational features. |
+| `dashboards` | `roles.staff`, `channels.ticketLogs`, `channels.pinsDashboard`, `channels.fulfillmentLogs` | Fulfillment logs show concise staff, creature, outcome, target and relative time summaries; log channels remain staff-only. |
 
 The example at `config/examples/instance.example.json` shows the complete configuration shape, including IDs for optional fields. Replace all example values with values from the test guild and test server before using it. Do not copy real IDs or secrets into tracked files.
 

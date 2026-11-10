@@ -12,11 +12,12 @@ function services() {
     catalogManager:{ current:() => ({ version:'1',get:() => ({ id:'rex',name:'Rex' }) }) },
     playerNames:{ submit:async x => x,verify:async x => x },dashboardPanels:{ get:async () => null,save:async () => {} },
     tickets:{ create:async x => x,claim:async x => x,close:async x => x,reopen:async x => x,
-      connectChannels() {},recoverChannels:async () => {} }
+      connectChannels() {},subscribe:() => () => {},recoverChannels:async () => {} }
   };
 }
 
 const discord = { tokenSecret:'DISCORD_TOKEN',guildId:'10000000000000001',
+  roles:{ staff:'10000000000000004' },
   channels:{ requests:'10000000000000002',playerNames:'10000000000000003' } };
 
 test('tickets start after required player-name feature and panel listeners are cleaned up', async () => {

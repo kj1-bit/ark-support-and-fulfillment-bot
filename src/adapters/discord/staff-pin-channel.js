@@ -2,23 +2,23 @@
 
 const { PermissionFlagsBits, OverwriteType } = require('discord.js');
 
-async function requirePrivatePinChannel(channel, context) {
+async function requirePrivateStaffChannel(channel, context, channelId, label = 'Staff panel') {
   const config = context.config.discord;
-  if (!channel || channel.id !== config.channels.pinsDashboard || channel.guildId !== config.guildId
+  if (!channel || channel.id !== channelId || channel.guildId !== config.guildId
     || !config.roles.staff || typeof channel.guild?.roles?.fetch !== 'function'
     || !channel.permissionOverwrites?.cache || typeof channel.permissionsFor !== 'function') {
-    throw new Error('PIN dashboard privacy could not be verified.');
+    throw new Error(`${label} privacy could not be verified.`);
   }
   const roles = await channel.guild.roles.fetch();
   if (!roles.has(config.roles.staff) || !roles.has(config.guildId)) {
-    throw new Error('PIN dashboard privacy could not be verified.');
+    throw new Error(`${label} privacy could not be verified.`);
   }
   for (const role of roles.values()) {
     if (role.id === config.roles.staff || role.permissions.has(PermissionFlagsBits.Administrator)
       || (role.managed && role.tags?.botId)) continue;
     const permissions = channel.permissionsFor(role);
     if (!permissions || permissions.has(PermissionFlagsBits.ViewChannel)) {
-      throw new Error('PIN dashboard must be staff-only.');
+      throw new Error(`${label} must be staff-only.`);
     }
   }
   for (const overwrite of channel.permissionOverwrites.cache.values()) {
@@ -30,14 +30,18 @@ async function requirePrivatePinChannel(channel, context) {
       if (error?.code === 10007) continue;
       throw error;
     }
-    if (!member) throw new Error('PIN dashboard privacy could not be verified.');
+    if (!member) throw new Error(`${label} privacy could not be verified.`);
     if (member.user?.bot || member.roles.cache.has(config.roles.staff)
       || member.permissions.has(PermissionFlagsBits.Administrator)) continue;
     const permissions = channel.permissionsFor(member);
     if (!permissions || permissions.has(PermissionFlagsBits.ViewChannel)) {
-      throw new Error('PIN dashboard must be staff-only.');
+      throw new Error(`${label} must be staff-only.`);
     }
   }
+}
+
+function requirePrivatePinChannel(channel, context) {
+  return requirePrivateStaffChannel(channel, context, context.config.discord.channels.pinsDashboard, 'PIN dashboard');
 }
 
 function createPinPrivacyListeners({ guildId, channelId, staffRoleId, getBotId, getChannel, onChange }) {
@@ -106,4 +110,4 @@ async function fetchPrivatePinChannel(context) {
   return channel;
 }
 
-module.exports = { requirePrivatePinChannel, fetchPrivatePinChannel, createPinPrivacyListeners };
+module.exports = { requirePrivatePinChannel, requirePrivateStaffChannel, fetchPrivatePinChannel, createPinPrivacyListeners };

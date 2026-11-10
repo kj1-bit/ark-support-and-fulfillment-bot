@@ -251,6 +251,31 @@ test('gateway creates explicit private overwrites and archives without deleting'
   assert.deepEqual(state.renames,['closed-1-player-1','player-1']);
 });
 
+test('opening, claimed and restored ticket messages contain no reference or claiming moderator', async () => {
+  const record = { id:'TKT-test',actorId:id(6),channelId:id(8),ticketNumber:123,state:'OPEN' };
+  const { gateway,channel } = gatewayFixture();
+  const messages = [];
+  channel.send = async body => { messages.push(body); return { id:id(9) }; };
+  await gateway.post(record);
+  assert.match(messages[0].content,/Your ticket is open/);
+  const edits = [];
+  channel.messages.fetch = async () => ({ edit:async body => edits.push(body) });
+  await gateway.sync({ ...record,state:'CLAIMED',moderator_id:id(7),messageId:id(9) });
+  for (const body of [messages[0],...edits]) {
+    for (const value of ['TKT-test','123',id(7),'Reference:']) assert(!body.content.includes(value));
+  }
+  assert(!edits[0].components[0].components.some(button => button.label === 'Claim Ticket'));
+});
+
+test('ticket claim and requester close retain the real action actors for staff logs', async t => {
+  const s = await setup(t);
+  const record = await s.create();
+  await s.service.claim({ ticketId:record.id,context:moderator });
+  await s.service.close({ ticketId:record.id,context:{ ...moderator,actorId:requester.actorId,roleIds:[] } });
+  assert.equal(s.events.find(event => event.type === 'ticket.claimed').data.actionActorId,moderator.actorId);
+  assert.equal(s.events.find(event => event.type === 'ticket.closed').data.actionActorId,requester.actorId);
+});
+
 test('ticket channels require Manage Roles and never grant the bot guild-level-only Manage Messages', async () => {
   const record = { id:'TKT-test',actorId:id(6),channelId:id(8),ticketNumber:1,state:'OPEN' };
   const full = gatewayFixture();

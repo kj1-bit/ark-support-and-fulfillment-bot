@@ -89,11 +89,20 @@ function createFulfillmentService({
       }
       const claimed = await repository.claim(session.requestId, input.context.actorId, clock());
 
-      const availability = await onlinePlayers.revalidate({
-        playerRef: claimed.playerRef,
-        serverId: claimed.serverId,
-        eosId: claimed.eosId
-      });
+      let availability;
+      try {
+        availability = await onlinePlayers.revalidate({
+          playerRef: claimed.playerRef,
+          serverId: claimed.serverId,
+          eosId: claimed.eosId
+        });
+      } catch (error) {
+        const failed = await repository.update(claimed.id, STATES.FAILED, {
+          completedAt: clock(), results: [{ success:false }]
+        });
+        audit.write('fulfillment.completed', failed);
+        throw error;
+      }
       if (!availability.online) {
         const failed = await repository.update(claimed.id, STATES.FAILED, {
           completedAt: clock(),

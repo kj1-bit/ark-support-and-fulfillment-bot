@@ -36,7 +36,10 @@ function setup() {
   const controller = {
     authorize: (i, capability = 'fulfillment.confirm') => { calls.authorization.push(capability); if (i.denied) throw new Error('Denied'); },
     catalog, search: createCatalogSearchService({ catalogManager: { current: catalog } }).search,
-    scan: async (i, data) => { calls.scan.push(data); return [{ playerRef: 'trusted-ref', displayName: 'Survivor', trusted: true }]; },
+    scanPage: async (i, data) => { calls.scan.push(data); return {
+      players: [{ playerRef: data.linking ? 'observed-ref' : 'trusted-ref',
+        displayName: 'Survivor', trusted: !data.linking, serverId: 'map-one' }],
+      page: 1, total: 1, pageSize: 25 }; },
     scanCandidates: async () => [{ playerRef: 'observed-ref', displayName: 'Online Name', trusted: false }],
     begin: async (i, data) => { calls.begin.push({ messageId: i.message.id, ...data }); return {
       notice: 'Review the verified target.', playerName: 'Survivor', creatureName: 'Rex 00',
@@ -66,10 +69,9 @@ async function chooseCreature(router, catalog) {
   return router.handle(interaction('select', menu.custom_id, [menu.options[0].value]));
 }
 async function chooseMap(router, creature) {
-  const maps = await router.handle(interaction('button', component(creature, 'Select Online Player').custom_id));
-  const menu = component(maps, 'Select a map');
-  assert.deepEqual(menu.options.map(option => option.value), ['map-one']);
-  return router.handle(interaction('select', menu.custom_id, ['map-one']));
+  const players = await router.handle(interaction('button', component(creature, 'Select Online Player').custom_id));
+  assert.equal(component(players, 'Select a map'), undefined);
+  return players;
 }
 
 test('standing fulfillment and player-name panels retain V1 labels', () => {
@@ -80,7 +82,7 @@ test('standing fulfillment and player-name panels retain V1 labels', () => {
   assert(component(views.playerNamesPanelView(), 'Verify Player Name'));
   assert(component(views.playerNamesPanelView(), 'Link Online Player'));
 });
-test('paged catalog -> creature -> map -> trusted online player -> danger confirmation uses exact private message', async () => {
+test('paged catalog -> creature -> cross-map online player -> danger confirmation uses exact private message', async () => {
   const { router, calls } = setup();
   const catalog = await browse(router);
   assert.equal(component(catalog, 'Previous').disabled, true);
@@ -92,7 +94,7 @@ test('paged catalog -> creature -> map -> trusted online player -> danger confir
   const creature = await chooseCreature(router, previous);
   assert(component(creature, 'Back to Catalog'));
   const players = await chooseMap(router, creature);
-  assert.deepEqual(calls.scan, [{ serverId: 'map-one', ttlMs: 120000 }]);
+  assert.deepEqual(calls.scan, [{ serverIds: ['map-one'], ttlMs: 120000, linking: false, page: 1 }]);
   assert.equal(calls.begin.length, 0);
   const menu = component(players, 'Select an online player');
   assert.equal(menu.options[0].value, 'trusted-ref');

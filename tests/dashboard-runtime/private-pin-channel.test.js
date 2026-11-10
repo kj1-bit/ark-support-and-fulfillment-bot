@@ -84,11 +84,11 @@ test('private destination is fetched fresh, not trusted from the interaction cac
   assert(fetched);
 });
 
-test('directory escapes hostile names, stays within Discord embed limits, has unique paging and separate activity IDs', () => {
+test('directory escapes hostile names, hides PINs, and offers only paging, private reveal and generation', () => {
   const panel = { key:'pins',title:'PIN activity' };
   const name = '**spoof** [link](https://bad.invalid) @everyone <@123> `code`\nnext';
   for (const page of [1,2,3]) {
-    const body = pinPagePayload(panel,'directory',{
+    const body = pinPagePayload(panel,{
       page,pageSize:10,total:23,
       results:Array.from({ length:10 },(_,index) => ({
         userId:`100000000000001${String(index).padStart(2,'0')}`,playerName:name,pin:'5820'
@@ -99,20 +99,17 @@ test('directory escapes hostile names, stays within Discord embed limits, has un
     assert(!description.includes('@everyone'));
     assert(description.includes('\\[link]('));
     assert(!description.includes('<@123>'));
-    assert(description.includes('Current Vault PIN: **5820**'));
+    assert(description.includes('Vault PIN: hidden'));
+    assert(!JSON.stringify(body).includes('5820'));
+    assert.equal(body.embeds[0].footer, undefined);
     assert(description.length <= 4096);
     assert.deepEqual(body.allowedMentions,{ parse:[] });
     const ids = assertUniqueCustomIds(body);
-    assert.equal(ids.length,5);
-    assert(ids.includes('v2:dashboard:pins:activity-refresh:1'));
+    assert.equal(ids.length,4);
+    assert(ids.includes(`v2:dashboard:pins:directory-reveal:${page}`));
+    assert(!JSON.stringify(body).includes('PIN Activity'));
   }
-  const empty = pinPagePayload(panel,'directory',{ page:1,pageSize:10,total:0,results:[] });
+  const empty = pinPagePayload(panel,{ page:1,pageSize:10,total:0,results:[] });
   assert.match(empty.embeds[0].description,/No generated/);
-  const activity = pinPagePayload(panel,'activity',{
-    page:1,pageSize:10,total:1,results:[{ type:'pin.vault-generated',occurredAt:1000,details:{ pin:'5820',protectedPin:'sealed',userId:'player' } }]
-  });
-  assertUniqueCustomIds(activity);
-  assert(!JSON.stringify(activity).includes('5820'));
-  assert(!JSON.stringify(activity).includes('sealed'));
-  assert(JSON.stringify(activity).includes('v2:dashboard:pins:directory-refresh:1'));
+  assert.equal(empty.components[0].components.length,2);
 });

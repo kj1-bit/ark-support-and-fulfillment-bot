@@ -7,7 +7,7 @@ function publicTicket(row) {
     actorId: row.actor_id, guildId: row.guild_id, channelId: row.channel_id,
     sourceChannelId: row.source_channel_id, messageId: row.message_id,
     ticketNumber: row.ticket_number, channelStatus: row.channel_status,
-    completedAt: row.completed_at, playerName: row.player_name,
+    completedAt: row.completed_at, playerName: row.player_name, moderatorId: row.moderator_id,
     state: row.state !== 'CLOSED' && row.completed_at !== null && row.completed_at !== undefined
       ? 'COMPLETED' : row.state
   };
@@ -20,6 +20,17 @@ function createSqliteTicketRepository(database) {
   const find = async id => publicTicket(await database.get('SELECT * FROM tickets WHERE id=?', [id]));
   return Object.freeze({
     get: find,
+    async openPage(guildId, page = 1) {
+      const pageSize = 5;
+      const count = await database.get("SELECT COUNT(*) AS total FROM tickets WHERE guild_id=? AND state<>'CLOSED'", [guildId]);
+      const total = Number(count.total);
+      const currentPage = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
+      const rows = await database.all(
+        `SELECT id,actor_id,player_name,guild_id,channel_id,channel_status,state,moderator_id,completed_at
+         FROM tickets WHERE guild_id=? AND state<>'CLOSED' ORDER BY created_at,id LIMIT ? OFFSET ?`,
+        [guildId,pageSize,(currentPage - 1) * pageSize]);
+      return { page:currentPage,pageSize,total,results:rows.map(publicTicket) };
+    },
     async findActive(guildId, actorId) {
       return publicTicket(await database.get(
         "SELECT * FROM tickets WHERE guild_id=? AND actor_id=? AND channel_status IS NOT NULL AND state IN ('OPEN','CLAIMED') ORDER BY created_at LIMIT 1",
@@ -85,16 +96,23 @@ function createSqliteTicketRepository(database) {
     },
     async claim(id, moderatorId, now) {
       const result = await database.run(
-        "UPDATE tickets SET state='CLAIMED',moderator_id=?,updated_at=? WHERE id=? AND state='OPEN' AND completed_at IS NULL",
+        "UPDATE tickets SET state='CLAIMED',moderator_id=?,updated_at=? WHERE id=? AND state='OPEN'",
         [moderatorId, now, id]
       );
       if (result.changes !== 1) throw new Error('Ticket is missing or no longer open.');
       return find(id);
     },
+    async unclaim(id, previousClaimant, now) {
+      const result = await database.run(
+        `UPDATE tickets SET state='OPEN',moderator_id=NULL,updated_at=?
+         WHERE id=? AND state IN ('OPEN','CLAIMED') AND moderator_id IS ?`,
+        [now,id,previousClaimant]);
+      return result.changes === 1;
+    },
     async complete(id, moderatorId, now) {
       const result = await database.run(
-        "UPDATE tickets SET completed_at=?,moderator_id=?,updated_at=? WHERE id=? AND state IN ('OPEN','CLAIMED') AND completed_at IS NULL",
-        [now, moderatorId, now, id]
+        "UPDATE tickets SET completed_at=?,updated_at=? WHERE id=? AND state IN ('OPEN','CLAIMED') AND completed_at IS NULL",
+        [now, now, id]
       );
       if (result.changes !== 1) throw new Error('Ticket is missing, closed, or already completed.');
       return find(id);
@@ -103,12 +121,12 @@ function createSqliteTicketRepository(database) {
       const states = fromStates.map(state => state === 'COMPLETED' ? 'CLAIMED' : state);
       const placeholders = states.map(() => '?').join(',');
       const result = await database.run(
-        `UPDATE tickets SET state=?,moderator_id=?,updated_at=?${toState === 'OPEN' ? ',completed_at=NULL' : ''}
+        `UPDATE tickets SET state=?,updated_at=?${toState === 'OPEN' ? ',completed_at=NULL,moderator_id=NULL' : ''}
          WHERE id=? AND state IN (${placeholders})
          ${toState === 'OPEN' ? `AND (channel_status IS NULL OR NOT EXISTS (
            SELECT 1 FROM tickets AS other WHERE other.guild_id=tickets.guild_id AND other.actor_id=tickets.actor_id
            AND other.id<>tickets.id AND other.channel_status IS NOT NULL AND other.state IN ('OPEN','CLAIMED'))) ` : ''}`,
-        [toState,meta.moderatorId,meta.updatedAt,id,...states]
+        [toState,meta.updatedAt,id,...states]
       );
       if (result.changes !== 1) throw new Error('Ticket state changed concurrently or transition is invalid.');
       return find(id);

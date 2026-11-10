@@ -33,13 +33,22 @@ function createOnlinePlayerSelectionService({ players, ark, clock = Date.now, uu
         discordId: trusted?.discordId || null, serverId, trusted: Boolean(trusted) });
     });
   }
-  async function scanPage({ context, serverId, ttlMs = 60000, includeUntrusted = false, page = 1 }) {
+  async function scanPage({ context, serverId, serverIds, ttlMs = 60000, includeUntrusted = false, page = 1 }) {
     if (!context?.actorId || !context?.guildId || !context?.channelId) throw new TypeError('Complete actor context is required.');
     if (!Number.isInteger(ttlMs) || ttlMs < 1 || ttlMs > 300000) throw new TypeError('Online-player selection ttlMs is invalid.');
     if (!Number.isSafeInteger(page) || page < 1) throw new TypeError('Online-player selection page is invalid.');
+    removeExpired(clock());
+    if (serverIds !== undefined && (!Array.isArray(serverIds) || serverIds.some(id => typeof id !== 'string' || !id))) {
+      throw new TypeError('Online-player scan servers are invalid.');
+    }
+    const targets = serverIds === undefined ? [serverId] : [...new Set(serverIds)];
+    const list = [];
+    // Scan sequentially to bound RCON load; any failed map fails the scan rather than hiding players.
+    for (const target of targets) {
+      list.push(...(await observed(target)).filter(player => includeUntrusted || player.trusted));
+    }
     const now = clock();
     removeExpired(now);
-    const list = (await observed(serverId)).filter(player => includeUntrusted || player.trusted);
     const lastPage = Math.max(1, Math.ceil(list.length / MAX_RESULTS));
     const currentPage = Math.min(page, lastPage);
     const results = list.slice((currentPage - 1) * MAX_RESULTS, currentPage * MAX_RESULTS).map(player => {
@@ -47,7 +56,7 @@ function createOnlinePlayerSelectionService({ players, ark, clock = Date.now, uu
       const playerRef = uuid();
       selections.set(playerRef, Object.freeze({ ...player, playerRef, actorId: context.actorId,
         guildId: context.guildId, channelId: context.channelId, expiresAt: now + ttlMs }));
-      return Object.freeze({ playerRef, displayName: player.displayName, serverId,
+      return Object.freeze({ playerRef, displayName: player.displayName, serverId: player.serverId,
         trusted: player.trusted, expiresAt: now + ttlMs });
     });
     return Object.freeze({ players: Object.freeze(results), page: currentPage, pageSize: MAX_RESULTS, total: list.length });

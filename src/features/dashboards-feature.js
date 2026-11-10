@@ -33,6 +33,28 @@ function pagePayload(panel, page, result, pinsEnabled = false) {
       return [`${requester} (${player})${event.opened ? ' opened a ticket' : ': Opened (record expired)'}`,
         ...parts].join(', ') + '.';
     }
+    if (panel.key === 'fulfillment') {
+      const mention = /^[1-9][0-9]{16,19}$/.test(String(event.actorId || ''))
+        ? `<@${event.actorId}>` : 'Unknown staff';
+      const creatureId = String(event.creatureId || '');
+      const creature = (creatureId ? panel.creatures?.list?.().find(item => item.id === creatureId)?.name : null)
+        || creatureId || 'Unknown creature';
+      const safeName = value => escapeMarkdown(String(value).slice(0, 40)
+        .replace(/[\r\n<>]/g, ' ').replace(/@/g, '@\u200b'), { maskedLink:true });
+      const creatureName = safeName(creature);
+      const player = safeName(event.playerName || 'Unknown player');
+      const state = String(event.state || '').toUpperCase();
+      const canceled = event.type === 'fulfillment.canceled' || state === 'CANCELED';
+      const outcome = canceled ? 'canceled'
+        : state === 'PARTIAL' ? 'partially succeeded'
+          : state === 'UNCERTAIN' ? 'outcome is uncertain'
+            : state === 'EXPIRED' ? 'expired before completion'
+              : event.type === 'fulfillment.succeeded' || state === 'SUCCEEDED' ? 'succeeded' : 'failed';
+      const summary = canceled || outcome === 'succeeded'
+        ? `${mention} ${canceled ? 'canceled' : 'spawned'} ${creatureName} for ${player}`
+        : `${mention}'s ${creatureName} spawn for ${player} ${outcome}`;
+      return `${summary} · <t:${time}:R>`;
+    }
     return `**${event.type}** · <t:${time}:R>\n${JSON.stringify(sanitizeDetails(event.details)).slice(0, 300)}`;
   });
   const description = entries.length ? entries.join('\n\n').slice(0, 4000) : 'No events recorded yet.';
@@ -135,7 +157,8 @@ function createDashboardsFeature() {
           payload:async () => directory
             ? pinPagePayload(definition, await context.services.pinDirectoryRestoration.page(page))
             : definition.key === 'pins' ? { content:'Vault PINs are disabled.', embeds:[], components:[] }
-              : pagePayload(definition, page, await context.services.dashboards.snapshot(definition.key, page))
+              : pagePayload({ ...definition,creatures:context.services.creatures },
+                page, await context.services.dashboards.snapshot(definition.key, page))
         });
         panels.push({ ...definition, panel, directory, setPage:value => { page = value; } });
       }
@@ -208,7 +231,8 @@ function createDashboardsFeature() {
         await interaction.deferUpdate();
         const result = await context.services.dashboards[definition.key]({ page, context:toInteractionContext(interaction) });
         definition.setPage(page);
-        await interaction.editReply(pagePayload(definition, page, result, context.config.features.pins));
+        await interaction.editReply(pagePayload({ ...definition,creatures:context.services.creatures },
+          page, result, context.config.features.pins));
       });
     },
     async start(context) { active = true; await Promise.all(panels.map(item => item.panel.start(context))); },

@@ -7,6 +7,7 @@ const { composeRuntime } = require('../../src/composition/compose-runtime');
 const { openSqliteDatabase } = require('../../src/adapters/sqlite/open-database');
 const { createFulfillmentController } = require('../../src/adapters/discord/fulfillment-controller');
 const { createDiscordRouter } = require('../../src/adapters/discord/router');
+const { pagePayload } = require('../../src/features/dashboards-feature');
 const views = require('../../src/adapters/discord/fulfillment-view');
 
 const id = n => `100000000000000${String(n).padStart(2,'0')}`;
@@ -66,7 +67,13 @@ test('real SQLite review -> confirm executes and persists a completion log, reje
   assert.equal(s.operations.length,1);
   const logs = await s.runtime.dashboards.snapshot('fulfillment',1);
   assert.equal(logs.results[0].type,'fulfillment.succeeded');
-  assert.equal(logs.results[0].details.id,model.requestId);
+  assert.deepEqual(logs.results[0],{
+    type:'fulfillment.succeeded',occurredAt:logs.results[0].occurredAt,
+    actorId:actor.actorId,creatureId:'achatina',playerName:'Mock Test Player',state:'SUCCEEDED'
+  });
+  assert.equal(pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',creatures:s.runtime.creatures },
+    1,logs).embeds[0].description,
+  `<@${actor.actorId}> spawned Achatina for Mock Test Player · <t:${Math.floor(logs.results[0].occurredAt / 1000)}:R>`);
   assert(s.audit.some(event => event.type === 'fulfillment.completed'));
   await assert.rejects(s.controller.confirm(s.interaction,{ token:model.token }),/already consumed/);
   assert.equal(s.operations.length,1);
@@ -78,7 +85,17 @@ test('real SQLite cancellation consumes the review token, persists its log and n
   const canceled = await s.controller.cancel(s.interaction,{ token:model.token });
   assert.equal(canceled.state,'CANCELED');
   assert.equal(s.operations.length,0);
-  assert.equal((await s.runtime.dashboards.snapshot('fulfillment',1)).results[0].type,'fulfillment.canceled');
+  const logs = await s.runtime.dashboards.snapshot('fulfillment',1);
+  assert.equal(logs.results[0].type,'fulfillment.canceled');
+  assert.deepEqual(logs.results[0],{
+    type:'fulfillment.canceled',occurredAt:logs.results[0].occurredAt,
+    actorId:actor.actorId,creatureId:'achatina',playerName:'Mock Test Player',state:'CANCELED'
+  });
+  assert.equal(pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',creatures:s.runtime.creatures },
+    1,logs).embeds[0].description,
+  `<@${actor.actorId}> canceled Achatina for Mock Test Player · <t:${Math.floor(logs.results[0].occurredAt / 1000)}:R>`);
+  assert.deepEqual((await s.runtime.operationalEvents.page({ category:'fulfillment' })).results[0].details,
+    { requestId:model.requestId,state:'CANCELED' });
   await assert.rejects(s.controller.confirm(s.interaction,{ token:model.token }),/already consumed/);
 });
 

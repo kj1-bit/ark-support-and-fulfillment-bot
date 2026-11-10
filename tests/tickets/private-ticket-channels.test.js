@@ -12,7 +12,9 @@ const { createSqliteRetentionRepository } = require('../../src/adapters/sqlite/r
 const { createTicketService } = require('../../src/domain/tickets/ticket-service');
 const { createAuthorizationPolicy, authorize } = require('../../src/security/authorization');
 const { createTicketChannelGateway } = require('../../src/adapters/discord/ticket-channel-gateway');
-const { PermissionFlagsBits, ChannelType } = require('discord.js');
+const {
+  ChannelType, OverwriteType, PermissionFlagsBits, PermissionOverwrites
+} = require('discord.js');
 
 const id = n => `100000000000000${n.toString().padStart(2,'0')}`;
 const config = { guildId:id(1), roles:{ staff:id(2) }, channels:{ requests:id(3), ticketLogs:id(4), ticketCategory:id(5) } };
@@ -216,6 +218,58 @@ test('failed and interrupted provisioning are recoverable without allocating dup
   await s.db.run("UPDATE tickets SET message_id=NULL WHERE id=?",[record.id]);
   await s.service.recoverChannels();
   assert.equal((await s.repository.get(record.id)).messageId,id(9));
+});
+
+test('startup recovery syncs a ticket when its requester is not cached', async t => {
+  const s = await setup(t);
+  const record = await s.create();
+  const client = {
+    user:{ id:id(30) },
+    users:{ cache:new Map(), resolve:() => undefined },
+    channels:{ fetch:async channelId => channelId === record.channelId ? channel : null }
+  };
+  const permissionView = { has:() => true };
+  const guild = {
+    id:id(1),
+    client,
+    roles:{ resolve:() => undefined },
+    members:{ me:{ id:id(30) } },
+    channels:{ fetch:async () => category }
+  };
+  const category = {
+    id:id(5),
+    guildId:id(1),
+    type:ChannelType.GuildCategory,
+    guild,
+    permissionsFor:() => permissionView
+  };
+  let resolved;
+  const channel = {
+    id:record.channelId,
+    guildId:id(1),
+    topic:`Ticketbot V2 request ${record.id}`,
+    name:'survivor-1',
+    guild,
+    permissionsFor:() => permissionView,
+    permissionOverwrites:{
+      set:async overwrites => {
+        resolved = overwrites.map(overwrite => PermissionOverwrites.resolve(overwrite, guild));
+      }
+    },
+    messages:{ fetch:async () => ({ edit:async () => {} }) },
+    setName:async name => { channel.name = name; return channel; }
+  };
+  client.guilds = { fetch:async () => guild };
+  s.service.connectChannels(createTicketChannelGateway({
+    client,
+    config:{ discord:config }
+  }));
+
+  await s.service.recoverChannels();
+  assert.equal(client.users.cache.has(requester.actorId), false);
+  assert.deepEqual(resolved.map(overwrite => overwrite.type), [
+    OverwriteType.Role, OverwriteType.Role, OverwriteType.Member, OverwriteType.Member
+  ]);
 });
 
 function gatewayFixture({ granted = Object.values(PermissionFlagsBits), setName } = {}) {

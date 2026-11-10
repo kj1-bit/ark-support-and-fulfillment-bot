@@ -36,8 +36,9 @@ function pagePayload(panel, page, result, pinsEnabled = false) {
     if (panel.key === 'fulfillment') {
       const mention = /^[1-9][0-9]{16,19}$/.test(String(event.actorId || ''))
         ? `<@${event.actorId}>` : 'Unknown staff';
-      const creature = panel.creatures?.get?.(String(event.creatureId || ''))?.name
-        || event.creatureId || 'Unknown creature';
+      const creatureId = String(event.creatureId || '');
+      const creature = (creatureId ? panel.creatures?.list?.().find(item => item.id === creatureId)?.name : null)
+        || creatureId || 'Unknown creature';
       const safeName = value => escapeMarkdown(String(value).slice(0, 40)
         .replace(/[\r\n<>]/g, ' ').replace(/@/g, '@\u200b'), { maskedLink:true });
       const creatureName = safeName(creature);

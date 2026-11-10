@@ -6,10 +6,15 @@ const { EventEmitter } = require('node:events');
 const { createDashboardsFeature, pagePayload, requireStaffChannel } = require('../../src/features/dashboards-feature');
 const { createOperationalEventService } = require('../../src/domain/dashboards/operational-event-service');
 const { createDashboardService } = require('../../src/domain/dashboards/dashboard-service');
+const { createCreatureRegistry } = require('../../src/registries/creature-registry');
 const { assertUniqueCustomIds } = require('../helpers/custom-ids');
 const { privatePinChannel } = require('../helpers/private-pin-channel');
 
 const id = n => `100000000000000${n.toString().padStart(2,'0')}`;
+const creatures = createCreatureRegistry({ version:'2026.1.0',creatures:[{
+  id:'achatina',name:'Achatina',blueprint:'/Game/Achatina.Achatina',enabled:true,tameable:true,
+  deliveryMode:'single',supportsGender:false,saddleApplicable:false
+}] });
 
 async function setup(t) {
   const client = new EventEmitter();
@@ -250,8 +255,7 @@ test('ticket summaries are single comma-separated lines with action actors and h
 
 test('fulfillment logs render only concise escaped summaries for every terminal outcome', () => {
   const at = 1_800_000_000_000;
-  const body = pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',
-    creatures:new Map([['achatina',{ name:'Achatina' }]]) },1,{ pageSize:10,total:6,
+  const body = pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',creatures },1,{ pageSize:10,total:6,
     results:[
       { type:'fulfillment.succeeded',state:'SUCCEEDED',actorId:id(7),creatureId:'achatina',
         playerName:'Mud',occurredAt:at },
@@ -286,6 +290,25 @@ test('fulfillment logs render only concise escaped summaries for every terminal 
   for (const hidden of ['FUL-hidden','secret','fulfillment.failed','{']) {
     assert(!hostile.embeds[0].description.includes(hidden));
   }
+});
+
+test('real creature registry keeps historical unknown and missing creatures from breaking other fulfillment rows', () => {
+  const event = { type:'fulfillment.succeeded',actorId:id(7),playerName:'Mud',occurredAt:1_800_000_000_000 };
+  const body = pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',creatures },1,{
+    pageSize:10,total:4,results:[
+      { ...event,creatureId:'achatina' },
+      { ...event,creatureId:'removedcreature' },
+      { ...event },
+      { ...event,creatureId:'achatina' }
+    ]
+  });
+  assert.equal(body.embeds[0].description,[
+    `<@${id(7)}> spawned Achatina for Mud · <t:1800000000:R>`,
+    `<@${id(7)}> spawned removedcreature for Mud · <t:1800000000:R>`,
+    `<@${id(7)}> spawned Unknown creature for Mud · <t:1800000000:R>`,
+    `<@${id(7)}> spawned Achatina for Mud · <t:1800000000:R>`
+  ].join('\n\n'));
+  assert.deepEqual(body.allowedMentions,{ parse:[] });
 });
 
 test('PIN changes refresh the existing directory with no activity tab or plaintext codes', async t => {

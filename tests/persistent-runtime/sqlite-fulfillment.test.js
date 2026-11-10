@@ -71,9 +71,8 @@ test('real SQLite review -> confirm executes and persists a completion log, reje
     type:'fulfillment.succeeded',occurredAt:logs.results[0].occurredAt,
     actorId:actor.actorId,creatureId:'achatina',playerName:'Mock Test Player',state:'SUCCEEDED'
   });
-  assert.equal(pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',creatures:new Map([
-    ['achatina',{ name:'Achatina' }]
-  ]) },1,logs).embeds[0].description,
+  assert.equal(pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',creatures:s.runtime.creatures },
+    1,logs).embeds[0].description,
   `<@${actor.actorId}> spawned Achatina for Mock Test Player · <t:${Math.floor(logs.results[0].occurredAt / 1000)}:R>`);
   assert(s.audit.some(event => event.type === 'fulfillment.completed'));
   await assert.rejects(s.controller.confirm(s.interaction,{ token:model.token }),/already consumed/);
@@ -92,9 +91,8 @@ test('real SQLite cancellation consumes the review token, persists its log and n
     type:'fulfillment.canceled',occurredAt:logs.results[0].occurredAt,
     actorId:actor.actorId,creatureId:'achatina',playerName:'Mock Test Player',state:'CANCELED'
   });
-  assert.equal(pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',creatures:new Map([
-    ['achatina',{ name:'Achatina' }]
-  ]) },1,logs).embeds[0].description,
+  assert.equal(pagePayload({ key:'fulfillment',title:'Dino Fulfillment Logs',creatures:s.runtime.creatures },
+    1,logs).embeds[0].description,
   `<@${actor.actorId}> canceled Achatina for Mock Test Player · <t:${Math.floor(logs.results[0].occurredAt / 1000)}:R>`);
   assert.deepEqual((await s.runtime.operationalEvents.page({ category:'fulfillment' })).results[0].details,
     { requestId:model.requestId,state:'CANCELED' });

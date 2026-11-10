@@ -311,6 +311,24 @@ test('real creature registry keeps historical unknown and missing creatures from
   assert.deepEqual(body.allowedMentions,{ parse:[] });
 });
 
+test('catalog failures surface only on fulfillment paging and leave ticket logs rendering', async t => {
+  const s = await setup(t);
+  s.context.services.catalogManager = { current:() => { throw new Error('Catalog unavailable.'); } };
+  const press = async (key,channelId) => {
+    let body;
+    await s.emit('interactionCreate',{
+      customId:`v2:dashboard:${key}:refresh:1`,isButton:() => true,user:{ id:id(6) },guildId:id(1),channelId,
+      channel:s.channels.get(channelId),message:{ id:s.saved.get(key).messageId },member:{ roleIds:[id(2)] },
+      deferUpdate:async () => {},editReply:async payload => { body = payload; },
+      reply:async () => {},followUp:async () => {}
+    });
+    return body;
+  };
+  assert.match((await press('tickets',id(3))).embeds[0].title,/Ticket/);
+  const fulfillment = await press('fulfillment',id(5));
+  assert(!fulfillment?.embeds?.[0]?.title?.startsWith('Dino Fulfillment Logs'));
+});
+
 test('PIN changes refresh the existing directory with no activity tab or plaintext codes', async t => {
   const s = await setup(t);
   s.context.services.pinDirectoryRestoration.page = async () => ({

@@ -1,0 +1,136 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { createLauncherOptions } = require('../../scripts/start-v2');
+const { startV2 } = require('../../src/composition/start-v2');
+const { loadInitialCatalog } = require('../../src/composition/load-initial-catalog');
+const { createDashboardsFeature } = require('../../src/features/dashboards-feature');
+const { privatePinChannel } = require('../helpers/private-pin-channel');
+
+const id = n => `100000000000000${n.toString().padStart(2,'0')}`;
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const lines = payload => payload.embeds[0].description.replace(/<t:\d+:R>/g, '<t:N:R>').split('\n\n');
+
+function fakeDiscord(config) {
+  const client = new EventEmitter();
+  client.user = { id:id(90) };
+  client.isReady = () => true;
+  const sent = [];
+  const channels = new Map(['ticketLogs','pinsDashboard','fulfillmentLogs'].map(key => {
+    const channelId = config.discord.channels[key];
+    const messages = new Map();
+    return [channelId, {
+      ...privatePinChannel({ channelId, guildId:config.discord.guildId, staffRoleId:config.discord.roles.staff }),
+      messages:{ fetch:async messageId => {
+        if (!messages.has(messageId)) throw Object.assign(new Error('Unknown Message'), { code:10008 });
+        return messages.get(messageId);
+      } },
+      send:async payload => {
+        const message = { id:`${channelId}-${sent.length}`, channelId, payload, author:client.user,
+          edit:async body => { message.payload = body; } };
+        sent.push(message);
+        messages.set(message.id, message);
+        return message;
+      }
+    }];
+  }));
+  client.channels = { fetch:async channelId => channels.get(channelId) };
+  return { client, sent, channels };
+}
+
+test('launcher service facade renders active catalog names on the fulfillment panel, paging and refresh', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ticketbot-v2-dashboard-names-'));
+  const configPath = path.join(root, 'instance.json');
+  const catalogPath = path.resolve(__dirname, '../../data/dino-catalog.json');
+  fs.writeFileSync(configPath, JSON.stringify({
+    schemaVersion:1,
+    runtime:{ mode:'mock', environment:'dashboard-names-test', logLevel:'error' },
+    discord:{
+      clientId:id(10), guildId:id(1), tokenSecret:'DISCORD_TOKEN',
+      roles:{ staff:id(2), member:null, fulfillmentModerator:null },
+      channels:{ ticketCategory:null, vault:null, requests:null, playerNames:null,
+        pinsDashboard:id(4), ticketLogs:id(3), fulfillment:null, fulfillmentLogs:id(5) }
+    },
+    ark:{ timeoutMs:1000, servers:[{ id:'test-map', name:'Test Map', host:'127.0.0.1', port:27020,
+      passwordSecret:'ARK_SECRET', enabled:true, testOnly:true, operations:['listOnlinePlayers'] }] },
+    storage:{ databasePath:'runtime/database.sqlite', backupPath:'runtime/backups' },
+    features:{ tickets:false, pins:false, playerNames:false, shop:false, fulfillment:false, dashboards:true }
+  }));
+
+  let services;
+  const options = createLauncherOptions({
+    sourceRoot:root, configPath, catalogPath, env:{ DISCORD_TOKEN:'not-a-real-token' }, write:() => {}
+  });
+  const service = await startV2({
+    ...options,
+    createDiscordAdapter:async input => {
+      services = input.services;
+      return { start:async () => {}, stop:async () => {} };
+    }
+  });
+  const discord = fakeDiscord(service.config);
+  const context = { client:discord.client, config:service.config, logSink:async () => {}, services };
+  const feature = createDashboardsFeature();
+  t.after(async () => {
+    await feature.stop(context);
+    await service.stop();
+    fs.rmSync(root, { recursive:true, force:true });
+  });
+
+  const record = async creatureId => {
+    await service.runtime.operationalEvents.record('fulfillment.succeeded',
+      { actorId:id(7), playerName:'Mud', ...(creatureId ? { creatureId } : {}) });
+    await sleep(3);
+  };
+  await record('rex');
+  await record('removedcreature');
+  await record(null);
+  for (let i = 0; i < 8; i += 1) await record('achatina');
+
+  await feature.initialize(context);
+  await feature.register(context);
+  await feature.start(context);
+
+  const panel = discord.sent.find(message => message.channelId === id(5));
+  assert.equal(panel.payload.embeds[0].title, 'Dino Fulfillment Logs \u00b7 page 1');
+  const achatina = `<@${id(7)}> spawned Achatina for Mud \u00b7 <t:N:R>`;
+  assert.deepEqual(lines(panel.payload), [
+    ...Array(8).fill(achatina),
+    `<@${id(7)}> spawned Unknown creature for Mud \u00b7 <t:N:R>`,
+    `<@${id(7)}> spawned removedcreature for Mud \u00b7 <t:N:R>`
+  ]);
+  assert.deepEqual(panel.payload.allowedMentions, { parse:[] });
+
+  const press = async (action, page) => {
+    let body;
+    const listeners = discord.client.listeners('interactionCreate');
+    await Promise.all(listeners.map(listener => listener({
+      customId:`v2:dashboard:fulfillment:${action}:${page}`, isButton:() => true,
+      user:{ id:id(6) }, guildId:id(1), channelId:id(5), channel:discord.channels.get(id(5)),
+      message:{ id:panel.id }, member:{ roleIds:[id(2)] },
+      deferUpdate:async () => {}, editReply:async payload => { body = payload; },
+      reply:async () => assert.fail('Authorized paging must edit inline.'),
+      followUp:async () => assert.fail('Authorized paging must not fail.')
+    })));
+    return body;
+  };
+
+  const next = await press('next', 2);
+  assert.equal(next.embeds[0].title, 'Dino Fulfillment Logs \u00b7 page 2');
+  assert.deepEqual(lines(next), [`<@${id(7)}> spawned Rex for Mud \u00b7 <t:N:R>`]);
+
+  const source = loadInitialCatalog(catalogPath);
+  await services.catalogManager.activate(await services.catalogManager.propose({
+    version:'2026.9.9-dashboard-names',
+    creatures:source.creatures.map(item => item.id === 'achatina' ? { ...item, name:'Achatina Prime' } : item)
+  }));
+  const refreshed = await press('refresh', 1);
+  assert.equal(refreshed.embeds[0].title, 'Dino Fulfillment Logs \u00b7 page 1');
+  assert.equal(lines(refreshed)[0], `<@${id(7)}> spawned Achatina Prime for Mud \u00b7 <t:N:R>`);
+  assert(!refreshed.embeds[0].description.includes('spawned achatina '));
+});

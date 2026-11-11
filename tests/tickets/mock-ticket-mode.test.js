@@ -13,7 +13,7 @@ const { composeRuntime } = require('../../src/composition/compose-runtime');
 
 const names = ['v2-core','trusted-state','player-names','tickets','pins','operational-events',
   'fulfillment-targets','trusted-identity-associations','discord-panels','fulfillment-result-redaction',
-  'schema-integrity','ticket-channels','vault-pins','mock-ticket-multiplicity'];
+  'schema-integrity','ticket-channels','vault-pins','mock-ticket-multiplicity','remembered-players'];
 const migrations = names.map((name,index) => require(`../../src/migrations/${String(index + 1).padStart(3,'0')}-${name}`));
 const id = n => `1000000000000${String(n).padStart(4,'0')}`;
 const discord = { guildId:id(1),roles:{ staff:id(2) },
@@ -247,13 +247,13 @@ test('schema-13 forward upgrade preserves rows, saved panels, PINs and numbering
   const panels = await s.database.all('SELECT * FROM discord_panel_messages');
   const pins = await s.database.all('SELECT * FROM vault_pins');
   const real = await s.runtime('test');
-  assert.equal(real.schemaVersion,14);
+  assert.equal(real.schemaVersion,15);
   const after = await s.database.get("SELECT * FROM tickets WHERE id='existing'");
   for (const [key,value] of Object.entries(before)) assert.equal(after[key],value);
   assert.equal(after.mock_multiple,0);
   assert.deepEqual(await s.database.all('SELECT * FROM discord_panel_messages'),panels);
   assert.deepEqual(await s.database.all('SELECT * FROM vault_pins'),pins);
-  assert.equal(await createMigrationRunner({ database:s.database,migrations }).run(),14);
+  assert.equal(await createMigrationRunner({ database:s.database,migrations }).run(),15);
   await s.verifyPlayer(real);
   await assert.rejects(s.create(real),/already have an open request/);
   const mock = await s.runtime('mock');

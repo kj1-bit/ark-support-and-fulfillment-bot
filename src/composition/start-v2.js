@@ -31,6 +31,7 @@ async function startV2(options = {}) {
         players: runtime.players,
         onlinePlayers: runtime.onlinePlayers,
         playerRepository: runtime.playerRepository,
+        playerLinks: runtime.playerLinks,
         playerNames: runtime.playerNames,
         tickets: runtime.tickets,
         retiredPinControls: runtime.retiredPinControls,
@@ -49,6 +50,7 @@ async function startV2(options = {}) {
       throw new TypeError('Discord adapter must expose start().');
     }
     await discord.start();
+    runtime.playerObserver?.start();
     if (runtime.retention) {
       runtime.retention.start();
       void runtime.retention.runOnce().catch(() => writeSummary({
@@ -58,6 +60,7 @@ async function startV2(options = {}) {
     }
   } catch (error) {
     const cleanup = [];
+    if (runtime?.playerObserver) cleanup.push(() => runtime.playerObserver.stop());
     if (runtime?.retention) cleanup.push(() => runtime.retention.stop());
     if (discord && typeof discord.stop === 'function') cleanup.push(() => discord.stop());
     if (database && typeof database.close === 'function') cleanup.push(() => database.close());
@@ -76,6 +79,7 @@ async function startV2(options = {}) {
     stopped = true;
     const failures = [];
     for (const close of [
+      () => runtime.playerObserver?.stop(),
       () => runtime.retention?.stop(),
       () => typeof discord.stop === 'function' ? discord.stop() : undefined,
       () => typeof database.close === 'function' ? database.close() : undefined

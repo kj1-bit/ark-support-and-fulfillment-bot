@@ -2,6 +2,14 @@
 
 function safeInteractionMessage(error) {
   const message = String(error?.message || '');
+  const linkMessages = {
+    PLAYER_ALREADY_LINKED: 'This Discord member is already linked. Use Unlink Player first, then link again.',
+    IDENTITY_ALREADY_LINKED: 'This in-game identity is already linked. Use Unlink Player on its current Discord member first.',
+    PLAYER_NOT_LINKED: 'This Discord member has no linked in-game identity.',
+    LINK_CHANGED: 'This link has changed. Start Unlink Player again.',
+    INVALID_LINK_EOS: 'EOS ID must contain exactly 32 hexadecimal characters.'
+  };
+  if (Object.hasOwn(linkMessages, error?.code)) return linkMessages[error.code];
   if (error?.code === 'TICKET_ALREADY_OPEN') {
     const channel = /^[1-9][0-9]{16,19}$/.test(error.ticketChannelId || '')
       ? ` <#${error.ticketChannelId}>` : ' creation is in progress.';

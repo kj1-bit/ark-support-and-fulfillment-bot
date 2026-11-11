@@ -7,6 +7,7 @@ const { createFulfillmentController } = require('../../src/adapters/discord/fulf
 const { createOnlinePlayerSelectionService } = require('../../src/application/online-player-selection-service');
 const { createCatalogSearchService } = require('../../src/domain/shop/catalog-search-service');
 const { createPlayerRegistry } = require('../../src/registries/player-registry');
+const { createPlayerLinkService } = require('../../src/application/player-link-service');
 const views = require('../../src/adapters/discord/fulfillment-view');
 const actorId = '10000000000000001', guildId = '10000000000000002', channelId = '10000000000000003';
 const privateId = '10000000000000004', panelId = '10000000000000005', targetId = '10000000000000006';
@@ -31,6 +32,9 @@ function setup(linking = false) {
   const scans = [], pending = [], sessions = [], associations = [], capabilities = [];
   let nextRef = 0;
   const onlinePlayers = createOnlinePlayerSelectionService({ players,
+    audit:{ write() {} },
+    rememberedPlayers: { remember:async () => {}, page: async page => ({ players:observations.slice((page-1)*25,page*25).map(player => ({
+      ...player,serverId:'map-26' })),page,total:observations.length }) },
     ark: { listOnlinePlayers: async serverId => { scans.push(serverId); return serverId === 'map-26' ? observations : []; } },
     uuid: () => `observed-reference-${++nextRef}` });
   const catalog = { version: 'current', creatures: [{ id: 'rex', name: 'Rex', enabled: true, tameable: true }],
@@ -41,7 +45,9 @@ function setup(linking = false) {
     onlinePlayers, players, catalogManager, shop: createCatalogSearchService({ catalogManager }),
     fulfillment: { createPending: async input => { pending.push(input); return { id: 'pending' }; } },
     interactionGuard: { issue: async input => { sessions.push(input); return { token: 'confirmation-token', expiresAt: Date.now() + 120000 }; } },
-    playerRepository: { save: async record => associations.push(record) }, playerNames: { verify: async () => ({}) }
+    playerLinks: createPlayerLinkService({ players,
+      repository:{ insert:async record => associations.push(record) },audit:{ write() {} } }),
+    playerNames: { verify: async () => ({}) }
   };
   const servers = Array.from({ length: 26 }, (_, index) => ({
     id: `map-${index + 1}`, name: `Map ${index + 1}`, enabled: true,
@@ -87,13 +93,14 @@ test('cross-map scan reaches the 26th map and pages trusted players without a ma
   assert.deepEqual(state.scans, [...Array.from({ length:26 }, (_,i) => `map-${i+1}`),
     ...Array.from({ length:26 }, (_,i) => `map-${i+1}`)]);
 });
-test('26th staff linking candidate on 26th map associates selected Discord member using observed trusted ref', async () => {
+test('26th remembered staff linking candidate links without a map choice or live scan', async () => {
   const state = setup(true);
-  const secondMaps = await next(state, await openMaps(state, true));
-  const firstPlayers = await state.router.handle(interaction('select', component(secondMaps, 'Select a map').custom_id, ['map-26']));
+  const firstPlayers = await openMaps(state, true);
+  assert.equal(component(firstPlayers, 'Select a map'), undefined);
   const secondPlayers = await next(state, firstPlayers);
-  const menu = component(secondPlayers, 'Select an online player');
-  assert.equal(menu.options[0].description, 'Unverified observation');
+  const menu = component(secondPlayers, 'Select a remembered player');
+  assert.match(menu.options[0].description, /Last seen: Map 26/);
+  assert.deepEqual(state.scans, []);
   await state.router.handle(interaction('select', menu.custom_id, [menu.options[0].value]));
   assert.equal(state.associations.length, 1);
   assert.equal(state.associations[0].discordId, targetId);

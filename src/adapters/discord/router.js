@@ -7,7 +7,7 @@ const { ephemeral, isButton, isStringSelect, isModal } = require('./interaction-
 const FLOW_TTL_MS = 120000;
 const MAX_FLOWS = 500;
 const ACTIONS = new Set(['confirm', 'cancel', 'select', 'link', 'creature', 'previous', 'next',
-  'search', 'query', 'online', 'server', 'member', 'back', 'close']);
+  'search', 'query', 'online', 'server', 'member', 'back', 'close', 'manual', 'manual-submit', 'unlink']);
 
 function parseCustomId(value) {
   const parts = String(value || '').split(':');
@@ -44,7 +44,7 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
       || (flow.stage !== 'query-start' && (!flow.messageId || flow.messageId !== interaction.message?.id))) {
       throw new Error('This selection flow is invalid or expired.');
     }
-    controller.authorize?.(interaction, flow.linking || flow.verifying ? 'player-names.verify' : 'fulfillment.confirm');
+    controller.authorize?.(interaction, flow.linking || flow.verifying || flow.unlinking ? 'player-names.verify' : 'fulfillment.confirm');
     if (flow.catalogVersion && flow.catalogVersion !== controller.catalog().version) {
       throw new Error('Catalog version changed. Start a new catalog selection.');
     }
@@ -75,20 +75,23 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
     token => views.catalogView(result, token));
   }
   async function showPlayers(interaction, data) {
-    await interaction.editReply({ content:data.linking ? 'Scanning the selected map for online players...'
+    await interaction.editReply({ content:data.linking ? 'Loading remembered players...'
       : 'Scanning enabled fulfillment maps for verified online players...', embeds:[],components:[] });
     const result = await controller.scanPage(interaction,
-      { ...(data.linking ? { serverId: data.serverId } : { serverIds: allowedServers().map(server => server.id) }),
+      { ...(data.linking ? {} : { serverIds: allowedServers().map(server => server.id) }),
         ttlMs: FLOW_TTL_MS, linking: data.linking === true, page: data.playerPage || 1 });
     const players = result.players;
     return render(interaction, { ...data, stage: 'players', playerPage: result.page,
       playerTotal: result.total ?? players.length, playerRefs: players.map(player => player.playerRef),
       playerServers: Object.fromEntries(players.map(player => [player.playerRef, player.serverId])) },
       token => views.playerSelectionView({
-        content: players.length ? data.linking ? 'Select the observed online identity for the selected Discord member.'
-          : 'Select a verified online player.' : 'No eligible online players found.',
+        content: data.linking ? `Link Player for <@${data.discordId}>: Select a remembered player (online or offline), newest first.`
+          + (players.length ? '' : ' No remembered players found. Use Enter Player Manually.')
+          : players.length ? 'Select a verified online player.' : 'No eligible online players found.',
         customId: `v2:fulfillment:${data.linking ? 'link' : 'select'}:${token}`,
-        players, token, linking: data.linking, showBack: data.wizard === true,
+        players: players.map(player => ({ ...player,
+          serverName: config.ark?.servers?.find(server => server.id === player.serverId)?.name || player.serverId })),
+        token, linking: data.linking, showBack: data.wizard === true,
         page: result.page, total: result.total ?? players.length, pageSize: result.pageSize
       }));
   }
@@ -110,19 +113,41 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
       await interaction.deferReply({ flags: 64 });
       return showCatalog(interaction);
     }
-    if (handlePlayerLink && ['v2:player-name:verify', 'v2:player-name:link'].includes(interaction.customId)) {
+    if (handlePlayerLink && ['v2:player-name:verify', 'v2:player-name:link', 'v2:player-name:unlink'].includes(interaction.customId)) {
       if (!playerPanelMatches(interaction)) return false;
       controller.authorize(interaction, 'player-names.verify');
       const linking = interaction.customId.endsWith(':link');
+      const unlinking = interaction.customId.endsWith(':unlink');
       await interaction.deferReply({ flags: 64 });
-      return render(interaction, { stage: 'member', linking, verifying: !linking, wizard: true },
-        token => views.memberSelectionView(token, linking));
+      return render(interaction, { stage: 'member', linking, unlinking, verifying: !linking && !unlinking, wizard: true },
+        token => views.memberSelectionView(token, linking, unlinking));
     }
     return false;
   }
   async function handleFlow(interaction, parsed) {
     const { action, token } = parsed;
     const flow = resolve(interaction, token);
+    if (action === 'manual' && isButton(interaction) && flow.stage === 'players' && flow.linking) {
+      flows.delete(token);
+      const modalToken = store(interaction, { ...flow, stage: 'manual' });
+      return interaction.showModal(views.manualPlayerModal(modalToken));
+    }
+    if (action === 'manual-submit' && isModal(interaction) && flow.stage === 'manual' && flow.linking) {
+      flows.delete(token);
+      await interaction.deferUpdate();
+      const linked = await controller.associateManual(interaction, { discordId: flow.discordId,
+        displayName: interaction.fields.getTextInputValue('player-name'),
+        eosId: interaction.fields.getTextInputValue('eos-id') });
+      return interaction.editReply({ content: `Linked in-game identity for <@${flow.discordId}>: ${linked.displayName}.`,
+        components: [], embeds: [], allowedMentions: { parse: [] } });
+    }
+    if (action === 'unlink' && isButton(interaction) && flow.stage === 'unlink-confirm' && flow.unlinking) {
+      flows.delete(token);
+      await interaction.deferUpdate();
+      await controller.unlink(interaction, { discordId: flow.discordId, eosId: flow.eosId });
+      return interaction.editReply({ content: `Unlinked in-game identity for <@${flow.discordId}>. Use Link Player to select the correct player.`,
+        components: [], embeds: [], allowedMentions: { parse: [] } });
+    }
     if (action === 'search' && isButton(interaction) && flow.stage === 'catalog') {
       flows.delete(token);
       const modalToken = store(interaction, { ...flow, stage: 'query' });
@@ -139,7 +164,7 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
       await interaction.deferUpdate();
       return interaction.editReply({ content: 'Selection canceled.', components: [], embeds: [] });
     }
-    if (action === 'back' && isButton(interaction) && !flow.linking && flow.wizard) {
+    if (action === 'back' && isButton(interaction) && !flow.linking && !flow.unlinking && flow.wizard) {
       flows.delete(token);
       await interaction.deferUpdate();
       return showCatalog(interaction, flow);
@@ -180,10 +205,16 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
       await interaction.deferUpdate();
       if (flow.verifying) {
         await controller.verify(interaction, { discordId: value });
-        return interaction.editReply({ content: 'Player name verified. Use Link Online Player to associate a trusted online identity.',
+        return interaction.editReply({ content: 'Player name verified. Use Link Player to associate an in-game identity.',
           components: [], embeds: [] });
       }
-      return showMaps(interaction, { ...flow, discordId: value, serverPage: 1 });
+      if (flow.unlinking) {
+        const linked = controller.linkedPlayer(interaction, value);
+        return render(interaction, { ...flow, stage: 'unlink-confirm', discordId: value, eosId: linked.eosId },
+          id => views.unlinkPlayerView(linked, id));
+      }
+      controller.assertUnlinked(interaction, value);
+      return showPlayers(interaction, { ...flow, discordId: value, playerPage: 1 });
     }
     if (action === 'server' && isStringSelect(interaction) && flow.stage === 'server') {
       if (!flow.serverIds.includes(value) || !allowedServers(flow.linking).some(server => server.id === value)) {
@@ -201,9 +232,10 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
       await interaction.deferUpdate();
       if (flow.linking) {
         const linked = await controller.associate(interaction, {
-          playerRef: value, discordId: flow.discordId, serverId: flow.serverId
+          playerRef: value, discordId: flow.discordId
         });
-        return interaction.editReply({ content: `Verified trusted identity for ${linked.displayName}.`, components: [] });
+        return interaction.editReply({ content: `Linked in-game identity for <@${flow.discordId}>: ${linked.displayName}.`,
+          components: [], embeds: [], allowedMentions: { parse: [] } });
       }
       const model = await controller.begin(interaction, {
         serverId: flow.playerServers[value], creatureId: flow.creatureId, playerRef: value,
@@ -219,7 +251,7 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
       cleanFlows();
       try {
         if (isButton(interaction) && ['v2:fulfillment:browse', 'v2:fulfillment:search',
-          'v2:player-name:verify', 'v2:player-name:link'].includes(interaction.customId)) return await beginPanel(interaction);
+          'v2:player-name:verify', 'v2:player-name:link', 'v2:player-name:unlink'].includes(interaction.customId)) return await beginPanel(interaction);
         const parsed = parseCustomId(interaction.customId);
         if (!parsed) return false;
         if (isButton(interaction) && ['confirm', 'cancel'].includes(parsed.action) && handleFulfillment) {

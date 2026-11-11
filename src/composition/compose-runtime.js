@@ -44,6 +44,10 @@ const migration011 = require('../migrations/011-schema-integrity');
 const migration012 = require('../migrations/012-ticket-channels');
 const migration013 = require('../migrations/013-vault-pins');
 const migration014 = require('../migrations/014-mock-ticket-multiplicity');
+const migration015 = require('../migrations/015-remembered-players');
+const { createRememberedPlayerRepository } = require('../adapters/sqlite/remembered-player-repository');
+const { createPlayerLinkService } = require('../application/player-link-service');
+const { createPlayerObserver } = require('../application/player-observer');
 const { checkIntegrity } = require('../recovery/database-recovery');
 
 function buildAuthorizationOptions(config) {
@@ -139,7 +143,7 @@ async function composeRuntime(options = {}) {
     database,
     migrations: [
       migration001, migration002, migration003, migration004, migration005,
-      migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014
+      migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015
     ],
     clock
   }).run();
@@ -220,6 +224,8 @@ async function composeRuntime(options = {}) {
 
   const playerRepository = createSqlitePlayerRepository(database);
   const players = createPlayerRegistry(await playerRepository.list());
+  const playerLinks = createPlayerLinkService({ repository: playerRepository, players, audit, clock });
+  const rememberedPlayers = createRememberedPlayerRepository(database);
   const playerNameRepository = createSqlitePlayerNameRepository(database);
   const basePlayerNames = createPlayerNameService({ repository: playerNameRepository, audit, clock });
   const playerNames = Object.freeze({
@@ -273,7 +279,9 @@ async function composeRuntime(options = {}) {
   const servers = createServerRegistry(config.ark.servers);
   const repository = createSqliteFulfillmentRepository(database);
   const ark = createArkOperationService({ serverRegistry: servers, transport, buildFulfillmentPlan });
-  const onlinePlayers = createOnlinePlayerSelectionService({ players, ark, clock, uuid: randomUUID });
+  const onlinePlayers = createOnlinePlayerSelectionService({ players, ark, rememberedPlayers, audit, clock, uuid: randomUUID });
+  const playerObserver = config.features.playerNames
+    ? createPlayerObserver({ onlinePlayers, servers: config.ark.servers, audit }) : null;
   const fulfillment = createFulfillmentService({
     authorization,
     interactionGuard,
@@ -302,6 +310,9 @@ async function composeRuntime(options = {}) {
     authorization,
     interactionGuard,
     players,
+    playerLinks,
+    rememberedPlayers,
+    playerObserver,
     onlinePlayers,
     playerRepository,
     playerNames,

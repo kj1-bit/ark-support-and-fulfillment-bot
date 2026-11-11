@@ -35,6 +35,7 @@ function setup() {
   const calls = { begin: [], scan: [], associate: [], verify: [], authorization: [] };
   const controller = {
     authorize: (i, capability = 'fulfillment.confirm') => { calls.authorization.push(capability); if (i.denied) throw new Error('Denied'); },
+    assertUnlinked() {},
     catalog, search: createCatalogSearchService({ catalogManager: { current: catalog } }).search,
     scanPage: async (i, data) => { calls.scan.push(data); return {
       players: [{ playerRef: data.linking ? 'observed-ref' : 'trusted-ref',
@@ -80,7 +81,8 @@ test('standing fulfillment and player-name panels retain V1 labels', () => {
   assert.equal(views.playerNamesPanelView().content, 'Click below to set or update your in-game name.');
   assert(component(views.playerNamesPanelView(), 'Set My In-Game Name'));
   assert(component(views.playerNamesPanelView(), 'Verify Player Name'));
-  assert(component(views.playerNamesPanelView(), 'Link Online Player'));
+  assert(component(views.playerNamesPanelView(), 'Link Player'));
+  assert(component(views.playerNamesPanelView(), 'Unlink Player'));
 });
 test('paged catalog -> creature -> cross-map online player -> danger confirmation uses exact private message', async () => {
   const { router, calls } = setup();
@@ -169,17 +171,16 @@ test('staff verification selects a Discord member instead of guessing identity f
   assert.deepEqual(calls.verify, [{ discordId: targetId }]);
   assert(calls.authorization.every(capability => capability === 'player-names.verify'));
 });
-test('staff online association selects a Discord user, enabled map and observed opaque player ref', async () => {
+test('staff association selects a Discord user then a remembered player without a map step', async () => {
   const { router, calls } = setup();
   const members = await router.handle(interaction('button', 'v2:player-name:link', [], { message: { id: panelId } }));
-  const maps = await router.handle(interaction('member', component(members, 'Select a Discord member').custom_id, [targetId]));
-  const mapMenu = component(maps, 'Select a map');
-  assert.deepEqual(mapMenu.options.map(option => option.value), ['map-one', 'scan-only']);
-  const players = await router.handle(interaction('select', mapMenu.custom_id, ['map-one']));
-  const menu = component(players, 'Select an online player');
+  const players = await router.handle(interaction('member', component(members, 'Select a Discord member').custom_id, [targetId]));
+  assert.equal(component(players, 'Select a map'), undefined);
+  assert.deepEqual(calls.scan, [{ ttlMs:120000, linking:true, page:1 }]);
+  const menu = component(players, 'Select a remembered player');
   await router.handle(interaction('select', menu.custom_id, ['observed-ref']));
   assert.deepEqual(calls.associate, [{ messageId: privateId, playerRef: 'observed-ref',
-    discordId: targetId, serverId: 'map-one' }]);
+    discordId: targetId }]);
 });
 test('controller rejects stale catalog before issuing confirmation and binds issue to private wizard', async () => {
   const issued = [], pending = [];

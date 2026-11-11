@@ -30,6 +30,7 @@ Purging terminal PIN requests also removes their dependent moderation-message bi
 ## Not purged automatically
 
 - Verified player-name and trusted-player identity associations: they are ongoing authorization state, not history. Remove them through an operator-reviewed process.
+- `remembered_players`: retains one row per EOS identity indefinitely, updating the last observed name, map and time. Retention does not purge these rows, and staff unlinking does not remove them. Keep this identity history and its backups private.
 - Encrypted generated Vault PINs: these are ongoing credentials retained for the user's repeated private DM retrieval, not one-time PIN requests. `completedPinDays` does not delete them. Removing or rotating them requires an operator-reviewed process; never reuse V1 PIN data.
 - Private ticket channels while `tickets` is disabled: channel deletion requires the enabled Discord ticket adapter. Tracked records are retained until successful channel cleanup, rather than orphaning Discord channels.
 - `tickets_v1_legacy` and other V1 archives, and database backups (retain according to the operator's backup policy). The legacy ticket archive may hold V1 usernames, Discord IDs, and channel IDs indefinitely by design. Keep it through test and rollback validation; after production acceptance, make an explicit decision to retain, export, redact, or securely delete it. It is deliberately excluded from automatic retention.

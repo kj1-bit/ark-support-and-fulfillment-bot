@@ -94,6 +94,7 @@ test('directory escapes hostile names, hides PINs, and offers only paging, priva
         userId:`100000000000001${String(index).padStart(2,'0')}`,playerName:name,pin:'5820'
       }))
     });
+
     const description = body.embeds[0].description;
     assert(description.includes('\\*\\*spoof\\*\\*'));
     assert(!description.includes('@everyone'));
@@ -112,4 +113,18 @@ test('directory escapes hostile names, hides PINs, and offers only paging, priva
   const empty = pinPagePayload(panel,{ page:1,pageSize:10,total:0,results:[] });
   assert.match(empty.embeds[0].description,/No generated/);
   assert.equal(empty.components[0].components.length,2);
+});
+
+test('directory identifies linked and unlinked players without pinging', () => {
+  const body = pinPagePayload({ key:'pins' }, {
+    page:1,pageSize:10,total:2,results:[
+      { userId:'10000000000000001',playerName:'Old name',linkedPlayerName:'New *name*',pin:'1234' },
+      { userId:'10000000000000002',playerName:'Submitted name',linkedPlayerName:null,pin:'5678' }
+    ]
+  });
+  assert.equal(body.embeds[0].description,
+    '<@10000000000000001> \u00b7 In-game name: **New \\*name\\***\nVault PIN: hidden\n\n' +
+    '<@10000000000000002> \u00b7 Not linked \u00b7 said: **Submitted name**\nVault PIN: hidden');
+  assert.deepEqual(body.allowedMentions,{ parse:[] });
+  assert(!JSON.stringify(body).includes('1234'));
 });

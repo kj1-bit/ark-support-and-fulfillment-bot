@@ -47,8 +47,7 @@ function createSqliteCatalogStore(database, { clock = Date.now } = {}) {
   }
 
   async function activate(registry) {
-    await database.executeSql('BEGIN IMMEDIATE');
-    try {
+    const update = async () => {
       await database.run(
         `UPDATE catalog_versions
          SET state = 'RETAINED'
@@ -71,10 +70,17 @@ function createSqliteCatalogStore(database, { clock = Date.now } = {}) {
           clock()
         ]
       );
-      await database.executeSql('COMMIT');
-    } catch (error) {
-      await database.executeSql('ROLLBACK').catch(() => {});
-      throw error;
+    };
+    if (database.transaction) await database.transaction(update);
+    else {
+      await database.executeSql('BEGIN IMMEDIATE');
+      try {
+        await update();
+        await database.executeSql('COMMIT');
+      } catch (error) {
+        await database.executeSql('ROLLBACK').catch(() => {});
+        throw error;
+      }
     }
     return loadActive();
   }

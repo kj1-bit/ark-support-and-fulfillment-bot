@@ -90,6 +90,7 @@ function validateConfig(input, options={}) {
     if (features.playerNames===true) {
       if (!discord?.roles?.staff) issues.push('configuration.features.playerNames: staff role is required');
       if (!discord?.channels?.playerNames) issues.push('configuration.features.playerNames: playerNames channel is required');
+      if (!discord?.channels?.pinsDashboard) issues.push('configuration.features.playerNames: pinsDashboard channel is required');
     }
     if (features.tickets===true) {
       if (!discord?.roles?.staff) issues.push('configuration.features.tickets: staff role is required');

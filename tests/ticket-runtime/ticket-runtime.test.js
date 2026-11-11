@@ -10,7 +10,9 @@ function services() {
     fulfillment:{ createPending:async () => ({ id:'r' }),confirm:async () => ({}) },
     players:{ byDiscord:() => null },onlinePlayers:{},
     catalogManager:{ current:() => ({ version:'1',get:() => ({ id:'rex',name:'Rex' }) }) },
-    playerNames:{ submit:async x => x,verify:async x => x },dashboardPanels:{ get:async () => null,save:async () => {} },
+    playerNames:{ submit:async x => x,linkedName:async () => null,
+      queueRestoration:async () => ({ results:[],page:1,pageSize:10,total:0 }) },
+    dashboardPanels:{ get:async () => null,save:async () => {} },
     tickets:{ create:async x => x,claim:async x => x,close:async x => x,reopen:async x => x,
       connectChannels() {},subscribe:() => () => {},recoverChannels:async () => {} }
   };
@@ -18,7 +20,7 @@ function services() {
 
 const discord = { tokenSecret:'DISCORD_TOKEN',guildId:'10000000000000001',
   roles:{ staff:'10000000000000004' },
-  channels:{ requests:'10000000000000002',playerNames:'10000000000000003' } };
+  channels:{ requests:'10000000000000002',playerNames:'10000000000000003',pinsDashboard:'10000000000000005' } };
 
 test('tickets start after required player-name feature and panel listeners are cleaned up', async () => {
   const client = new EventEmitter();

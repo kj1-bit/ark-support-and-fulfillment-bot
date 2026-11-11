@@ -75,14 +75,11 @@ async function chooseMap(router, creature) {
   return players;
 }
 
-test('standing fulfillment and player-name panels retain V1 labels', () => {
+test('public player-name panel contains only the name submission control', () => {
   assert.equal(views.fulfillmentPanelView().embeds[0].title, 'Dino Fulfillment');
   assert.deepEqual(components(views.fulfillmentPanelView()).map(c => c.label), ['Browse Dino Catalog', 'Search Dino']);
   assert.equal(views.playerNamesPanelView().content, 'Click below to set or update your in-game name.');
-  assert(component(views.playerNamesPanelView(), 'Set My In-Game Name'));
-  assert(component(views.playerNamesPanelView(), 'Verify Player Name'));
-  assert(component(views.playerNamesPanelView(), 'Link Player'));
-  assert(component(views.playerNamesPanelView(), 'Unlink Player'));
+  assert.deepEqual(components(views.playerNamesPanelView()).map(c => c.label), ['Set My In-Game Name']);
 });
 test('paged catalog -> creature -> cross-map online player -> danger confirmation uses exact private message', async () => {
   const { router, calls } = setup();
@@ -162,25 +159,13 @@ test('back and cancel never issue a pending request', async () => {
   assert.deepEqual(canceled.components, []);
   assert.equal(calls.begin.length, 0);
 });
-test('staff verification selects a Discord member instead of guessing identity from a name', async () => {
+test('retired public staff buttons cannot start a fulfillment router flow', async () => {
   const { router, calls } = setup();
-  const members = await router.handle(interaction('button', 'v2:player-name:verify', [], { message: { id: panelId } }));
-  const memberMenu = component(members, 'Select a Discord member');
-  assert.equal(memberMenu.type, 5);
-  await router.handle(interaction('member', memberMenu.custom_id, [targetId]));
-  assert.deepEqual(calls.verify, [{ discordId: targetId }]);
-  assert(calls.authorization.every(capability => capability === 'player-names.verify'));
-});
-test('staff association selects a Discord user then a remembered player without a map step', async () => {
-  const { router, calls } = setup();
-  const members = await router.handle(interaction('button', 'v2:player-name:link', [], { message: { id: panelId } }));
-  const players = await router.handle(interaction('member', component(members, 'Select a Discord member').custom_id, [targetId]));
-  assert.equal(component(players, 'Select a map'), undefined);
-  assert.deepEqual(calls.scan, [{ ttlMs:120000, linking:true, page:1 }]);
-  const menu = component(players, 'Select a remembered player');
-  await router.handle(interaction('select', menu.custom_id, ['observed-ref']));
-  assert.deepEqual(calls.associate, [{ messageId: privateId, playerRef: 'observed-ref',
-    discordId: targetId }]);
+  for (const action of ['verify','link','unlink']) {
+    assert.equal(await router.handle(interaction('button', `v2:player-name:${action}`, [], { message: { id:panelId } })),false);
+  }
+  assert.deepEqual(calls.verify,[]);
+  assert.deepEqual(calls.associate,[]);
 });
 test('controller rejects stale catalog before issuing confirmation and binds issue to private wizard', async () => {
   const issued = [], pending = [];

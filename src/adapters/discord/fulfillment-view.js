@@ -16,10 +16,8 @@ function fulfillmentPanelView() {
 }
 function playerNamesPanelView() {
   return { content: 'Click below to set or update your in-game name.',
-    components: [row([button('v2:player-name:set', 'Set My In-Game Name', 1),
-      button('v2:player-name:verify', 'Verify Player Name'),
-      button('v2:player-name:link', 'Link Player'),
-      button('v2:player-name:unlink', 'Unlink Player')])] };
+    allowedMentions: { parse: [] },
+    components: [row([button('v2:player-name:set', 'Set My In-Game Name', 1)])] };
 }
 function catalogSearchModal(token) {
   return new ModalBuilder().setCustomId(route('query', token)).setTitle('Search Dino').addComponents(
@@ -59,13 +57,6 @@ function serverSelectionView(servers, token, linking = false, page = 1) {
         ...(linking ? [button(route('close', token), 'Cancel')] : navigation(token))])
     ] };
 }
-function memberSelectionView(token, linking, unlinking = false) {
-  return { content: unlinking ? 'Unlink Player: Select the Discord member whose in-game identity should be unlinked.'
-    : linking ? 'Link Player: Select the Discord member to link to an in-game identity. The player does not need to be online.'
-      : 'Select the Discord member whose submitted name should be verified.',
-    components: [row([select(route('member', token), 'Select a Discord member', null, 5)]),
-      row([button(route('close', token), 'Cancel')])] };
-}
 function rememberedPlayerDescription(player) {
   const status = player.trusted ? 'Already linked' : player.serverId === 'previous-link'
     ? 'Previously linked' : `Last seen: ${player.serverName || player.serverId}`;
@@ -85,20 +76,6 @@ function playerSelectionView({ content, customId, players, token, linking, page,
     ])] : [])
   ] };
 }
-function manualPlayerModal(token) {
-  return new ModalBuilder().setCustomId(route('manual-submit', token)).setTitle('Link Player Manually').addComponents(
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('player-name')
-      .setLabel('In-game player name').setStyle(TextInputStyle.Short).setMinLength(2).setMaxLength(32).setRequired(true)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('eos-id')
-      .setLabel('EOS ID (32 hexadecimal characters)').setStyle(TextInputStyle.Short).setMinLength(32).setMaxLength(32).setRequired(true)));
-}
-function unlinkPlayerView(player, token) {
-  const { maskEosId } = require('./fulfillment-controller');
-  return { content: `Unlink Player for <@${player.discordId}>?\nIn-game player: ${player.displayName}\nEOS ID: ${maskEosId(player.eosId)}\nThis removes the trusted identity link only. The submitted player name is unchanged. Unlink first, then link the correct player.`,
-    allowedMentions: { parse: [] }, embeds: [], components: [row([
-      button(route('unlink', token), 'Confirm Unlink', 4), button(route('close', token), 'Cancel')
-    ])] };
-}
 function confirmationView(model) {
   return { content: model.notice, embeds: [{ title: 'Review Dino Fulfillment', fields: [
     { name: 'Player', value: model.playerName }, { name: 'Creature', value: model.creatureName },
@@ -110,5 +87,4 @@ function resultView(result) {
   return { content: `Fulfillment status: ${result.state}`, components: [], embeds: [] };
 }
 module.exports = { confirmationView, playerSelectionView, resultView, fulfillmentPanelView,
-  playerNamesPanelView, catalogSearchModal, catalogView, creatureView, serverSelectionView, memberSelectionView,
-  manualPlayerModal, unlinkPlayerView };
+  playerNamesPanelView, catalogSearchModal, catalogView, creatureView, serverSelectionView };

@@ -89,10 +89,9 @@ async function setup(t) {
 
 test('one ticket line updates automatically through all lifecycle actions, showing only latest assignment/unclaimer and correct actors', async t => {
   const s = await setup(t);
-  await s.runtime.playerNames.submit({ discordId:requester.actorId,playerName:'Mud' });
-  await s.runtime.playerNames.verify({
-    discordId:requester.actorId,moderatorId:id(7),context:{ ...logStaff,channelId:id(3) }
-  });
+  const request = await s.runtime.playerNames.submit({ discordId:requester.actorId,playerName:'Mud' });
+  await s.runtime.playerLinks.link({ discordId:requester.actorId,displayName:'Mud',eosId:'a'.repeat(32),
+    source:'manual',actorId:id(7),request });
   const ticket = await s.runtime.tickets.create({ type:'SUPPORT',description:'Never show this',context:requester });
   const staff = actorId => ({ ...logStaff,actorId,channelId:ticket.channelId,messageId:ticket.messageId });
   const opened = `<@${id(6)}> (Mud) opened a ticket`;

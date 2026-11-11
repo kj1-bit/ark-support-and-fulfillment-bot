@@ -45,6 +45,7 @@ const migration012 = require('../migrations/012-ticket-channels');
 const migration013 = require('../migrations/013-vault-pins');
 const migration014 = require('../migrations/014-mock-ticket-multiplicity');
 const migration015 = require('../migrations/015-remembered-players');
+const migration016 = require('../migrations/016-approve-existing-links');
 const { createRememberedPlayerRepository } = require('../adapters/sqlite/remembered-player-repository');
 const { createPlayerLinkService } = require('../application/player-link-service');
 const { createPlayerObserver } = require('../application/player-observer');
@@ -71,7 +72,7 @@ function buildAuthorizationOptions(config) {
   if (enabled.playerNames === true) {
     capabilities['player-names.verify'] = Object.freeze({
       roleIds: Object.freeze([staff]),
-      channelIds: Object.freeze([requireId(channels.playerNames, 'discord.channels.playerNames')])
+      channelIds: Object.freeze([requireId(channels.pinsDashboard, 'discord.channels.pinsDashboard')])
     });
   }
   if (enabled.tickets === true) {
@@ -143,7 +144,7 @@ async function composeRuntime(options = {}) {
     database,
     migrations: [
       migration001, migration002, migration003, migration004, migration005,
-      migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015
+      migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014, migration015, migration016
     ],
     clock
   }).run();
@@ -230,10 +231,17 @@ async function composeRuntime(options = {}) {
   const basePlayerNames = createPlayerNameService({ repository: playerNameRepository, audit, clock });
   const playerNames = Object.freeze({
     submit: basePlayerNames.submit,
-    get: basePlayerNames.get,
-    async verify(input) {
-      authorization.authorize('player-names.verify', input.context);
-      return basePlayerNames.verify(input);
+    async get(discordId) {
+      const record = await basePlayerNames.get(discordId);
+      if (!record) return record;
+      const linked = await playerNameRepository.linkedName(discordId);
+      return linked ? { ...record, playerName:linked.displayName } : record;
+    },
+    linkedName: playerNameRepository.linkedName,
+    queueRestoration: playerNameRepository.queue,
+    async queue({ page = 1, context }) {
+      authorization.authorize('player-names.verify', context);
+      return playerNameRepository.queue(page);
     }
   });
   const ticketRepository = createSqliteTicketRepository(database, { mode:config.runtime?.mode });

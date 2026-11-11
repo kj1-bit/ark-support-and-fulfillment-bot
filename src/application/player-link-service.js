@@ -26,8 +26,9 @@ function createPlayerLinkService({ repository, players, audit, clock = Date.now 
   return Object.freeze({
     assertUnlinked,
     get: discordId => players.byDiscord(discordId),
-    link({ discordId, eosId, displayName, source, actorId, manual = false }) {
+    link({ discordId, eosId, displayName, source, actorId, request, expiresAt, manual = false }) {
       return serialize(async () => {
+        if (expiresAt !== undefined && Date.now() >= expiresAt) throw new Error('This selection flow is invalid or expired.');
         if (typeof eosId !== 'string' || eosId.length !== 32 || !EOS.test(eosId)) {
           throw linkError('INVALID_LINK_EOS', 'EOS ID must contain exactly 32 hexadecimal characters.');
         }
@@ -36,20 +37,24 @@ function createPlayerLinkService({ repository, players, audit, clock = Date.now 
           throw new TypeError('Player name contains unsupported characters or length.');
         }
         assertUnlinked(discordId, eosId);
+        if (!request || typeof request.playerName !== 'string' || !Number.isFinite(request.updatedAt)) {
+          throw linkError('REQUEST_CHANGED', 'The request changed. Start Link Player again.');
+        }
         const record = Object.freeze({ discordId, eosId: eosId.toLowerCase(), displayName: name,
           verified: true, verifiedAt: clock(), source });
-        await repository.insert(record);
+        await repository.approve(record, request, actorId, expiresAt);
         players.addVerified(record);
         audit.write('player-link.created', { discordId, actorId, source });
         return record;
       });
     },
-    unlink({ discordId, eosId, actorId }) {
+    unlink({ discordId, eosId, actorId, expiresAt }) {
       return serialize(async () => {
+        if (expiresAt !== undefined && Date.now() >= expiresAt) throw new Error('This selection flow is invalid or expired.');
         const current = players.byDiscord(discordId);
         if (!current) throw linkError('PLAYER_NOT_LINKED', 'This Discord member has no linked in-game identity.');
         if (current.eosId !== eosId) throw linkError('LINK_CHANGED', 'This link has changed. Start Unlink Player again.');
-        await repository.remove(discordId, eosId);
+        await repository.unlinkAndReset(discordId, eosId, clock(), expiresAt);
         players.remove(discordId);
         audit.write('player-link.removed', { discordId, actorId });
         return current;

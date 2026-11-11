@@ -16,60 +16,16 @@ function createFulfillmentController({ services, clock = Date.now }) {
     },
     catalog() { return services.catalogManager.current(); },
     search(input) { return services.shop.search(input); },
-    async verify(interaction, input) {
-      const context = toInteractionContext(interaction, { requireMessage: true });
-      services.authorization.authorize('player-names.verify', context);
-      return services.playerNames.verify({ discordId: input.discordId, moderatorId: context.actorId, context });
-    },
     async scan(interaction, input) {
       const context = toInteractionContext(interaction);
       services.authorization.authorize('fulfillment.confirm', context);
       return services.onlinePlayers.scan({ context, serverId: input.serverId, ttlMs: input.ttlMs });
     },
-    async scanCandidates(interaction, input) {
-      const context = toInteractionContext(interaction);
-      services.authorization.authorize('player-names.verify', context);
-      return services.onlinePlayers.scan({ context, serverId: input.serverId, ttlMs: input.ttlMs, includeUntrusted: true });
-    },
     async scanPage(interaction, input) {
       const context = toInteractionContext(interaction);
-      services.authorization.authorize(input.linking ? 'player-names.verify' : 'fulfillment.confirm', context);
+      services.authorization.authorize('fulfillment.confirm', context);
       return services.onlinePlayers.scanPage({ context, serverId: input.serverId, ttlMs: input.ttlMs,
-        serverIds: input.serverIds,
-        remembered: input.linking === true,
-        includeUntrusted: input.linking === true, page: input.page || 1 });
-    },
-    assertUnlinked(interaction, discordId) {
-      services.authorization.authorize('player-names.verify', toInteractionContext(interaction, { requireMessage: true }));
-      services.playerLinks.assertUnlinked(discordId);
-    },
-    linkedPlayer(interaction, discordId) {
-      services.authorization.authorize('player-names.verify', toInteractionContext(interaction, { requireMessage: true }));
-      const record = services.playerLinks.get(discordId);
-      if (!record) throw Object.assign(new Error('This Discord member has no linked in-game identity.'), { code: 'PLAYER_NOT_LINKED' });
-      return record;
-    },
-    async unlink(interaction, input) {
-      const context = toInteractionContext(interaction, { requireMessage: true });
-      services.authorization.authorize('player-names.verify', context);
-      return services.playerLinks.unlink({ ...input, actorId: context.actorId });
-    },
-    async associateManual(interaction, input) {
-      const context = toInteractionContext(interaction, { requireMessage: true });
-      services.authorization.authorize('player-names.verify', context);
-      return services.playerLinks.link({ ...input, actorId: context.actorId, source: 'manual', manual: true });
-    },
-    async associate(interaction, input) {
-      if (!services.playerLinks) {
-        throw new TypeError('Trusted identity persistence services are required.');
-      }
-      const context = toInteractionContext(interaction, { requireMessage: true });
-      services.authorization.authorize('player-names.verify', context);
-      const observed = services.onlinePlayers.resolve(input.playerRef, context, { allowUntrusted: true });
-      const record = await services.playerLinks.link({ discordId: input.discordId, eosId: observed.eosId,
-        displayName: observed.displayName, source: `observed:${observed.serverId}`, actorId: context.actorId });
-      services.onlinePlayers.consume?.(input.playerRef);
-      return record;
+        serverIds: input.serverIds, page: input.page || 1 });
     },
     async begin(interaction, input) {
       const context = toInteractionContext(interaction, { requireMessage: true });

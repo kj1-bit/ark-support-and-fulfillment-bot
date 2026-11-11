@@ -13,11 +13,11 @@ const { composeRuntime } = require('../../src/composition/compose-runtime');
 
 const names = ['v2-core','trusted-state','player-names','tickets','pins','operational-events',
   'fulfillment-targets','trusted-identity-associations','discord-panels','fulfillment-result-redaction',
-  'schema-integrity','ticket-channels','vault-pins','mock-ticket-multiplicity','remembered-players'];
+  'schema-integrity','ticket-channels','vault-pins','mock-ticket-multiplicity','remembered-players','approve-existing-links'];
 const migrations = names.map((name,index) => require(`../../src/migrations/${String(index + 1).padStart(3,'0')}-${name}`));
 const id = n => `1000000000000${String(n).padStart(4,'0')}`;
 const discord = { guildId:id(1),roles:{ staff:id(2) },
-  channels:{ requests:id(3),ticketLogs:id(4),ticketCategory:id(5),playerNames:id(3) } };
+  channels:{ requests:id(3),ticketLogs:id(4),ticketCategory:id(5),playerNames:id(3),pinsDashboard:id(8) } };
 const requester = { actorId:id(6),guildId:id(1),channelId:id(3),roleIds:[] };
 const moderator = record => ({
   actorId:id(7),guildId:id(1),channelId:record.channelId,messageId:record.messageId,roleIds:[id(2)]
@@ -69,10 +69,9 @@ async function setup(t, schema = 14) {
     return { ...value,gateway,connection };
   }
   async function verifyPlayer(value) {
-    await value.playerNames.submit({ discordId:requester.actorId,playerName:'Survivor' });
-    await value.playerNames.verify({
-      discordId:requester.actorId,moderatorId:id(7),context:{ ...requester,actorId:id(7),roleIds:[id(2)] }
-    });
+    const request = await value.playerNames.submit({ discordId:requester.actorId,playerName:'Survivor' });
+    await value.playerLinks.link({ discordId:requester.actorId,eosId:'a'.repeat(32),
+      displayName:'Survivor',source:'manual',actorId:id(7),request });
   }
   const create = value => value.tickets.create({
     type:'SUPPORT',description:'Test request',username:'Survivor',context:requester
@@ -247,13 +246,13 @@ test('schema-13 forward upgrade preserves rows, saved panels, PINs and numbering
   const panels = await s.database.all('SELECT * FROM discord_panel_messages');
   const pins = await s.database.all('SELECT * FROM vault_pins');
   const real = await s.runtime('test');
-  assert.equal(real.schemaVersion,15);
+  assert.equal(real.schemaVersion,16);
   const after = await s.database.get("SELECT * FROM tickets WHERE id='existing'");
   for (const [key,value] of Object.entries(before)) assert.equal(after[key],value);
   assert.equal(after.mock_multiple,0);
   assert.deepEqual(await s.database.all('SELECT * FROM discord_panel_messages'),panels);
   assert.deepEqual(await s.database.all('SELECT * FROM vault_pins'),pins);
-  assert.equal(await createMigrationRunner({ database:s.database,migrations }).run(),15);
+  assert.equal(await createMigrationRunner({ database:s.database,migrations }).run(),16);
   await s.verifyPlayer(real);
   await assert.rejects(s.create(real),/already have an open request/);
   const mock = await s.runtime('mock');

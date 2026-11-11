@@ -40,7 +40,7 @@ function createOnlinePlayerSelectionService({ players, ark, rememberedPlayers, a
     }
     return observations.map(observation => {
       const trusted = players.byEos(observation.eosId);
-      return Object.freeze({ eosId: observation.eosId, displayName: trusted?.displayName || observation.displayName,
+      return Object.freeze({ eosId: observation.eosId, displayName: observation.displayName,
         discordId: trusted?.discordId || null, serverId, trusted: Boolean(trusted) });
     });
   }
@@ -55,7 +55,7 @@ function createOnlinePlayerSelectionService({ players, ark, rememberedPlayers, a
         guildId: context.guildId, channelId: context.channelId, expiresAt: now + ttlMs }));
       return Object.freeze({ playerRef, displayName: player.displayName, serverId: player.serverId,
         maskedEos: `${player.eosId.slice(0, 4)}…${player.eosId.slice(-4)}`,
-        trusted: player.trusted, expiresAt: now + ttlMs });
+        trusted: player.trusted, lastSeenAt: player.lastSeenAt, expiresAt: now + ttlMs });
     });
     return Object.freeze({ players: Object.freeze(results), page: currentPage, pageSize: MAX_RESULTS, total });
   }
@@ -85,6 +85,13 @@ function createOnlinePlayerSelectionService({ players, ark, rememberedPlayers, a
   return Object.freeze({
     async scan(input) { return (await scanPage({ ...input, page: 1 })).players; },
     scanPage,
+    async matching({ context, name, ttlMs = 120000 }) {
+      if (!context?.actorId || !context?.guildId || !context?.channelId) throw new TypeError('Complete actor context is required.');
+      const list = await rememberedPlayers.matching(name);
+      return selectionPage({ context, ttlMs, list:list.map(player => ({
+        ...player, trusted:Boolean(players.byEos(player.eosId))
+      })), page:1, total:list.length, remembered:true });
+    },
     observe: observed,
     resolve(ref, context, { allowUntrusted = false } = {}) {
       const key = String(ref || '');

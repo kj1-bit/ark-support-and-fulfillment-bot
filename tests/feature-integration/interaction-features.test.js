@@ -47,6 +47,7 @@ function makeAdapter(overrides = {}) {
   const calls = { tickets: [], pin: null, pinMessage: null, playerName: null, logs: [] };
   const client = {
     user: { id: '10000000000000050' },
+    emit() {},
     on: (event, listener) => { if (event === 'interactionCreate') listeners.push(listener); },
     off: (event, listener) => {
       const index = listeners.indexOf(listener);
@@ -86,7 +87,8 @@ function makeAdapter(overrides = {}) {
     },
     playerNames: {
       submit: async input => { calls.playerName = input; return { id: 'p', state: 'PENDING' }; },
-      verify: async () => ({ id: 'p', state: 'VERIFIED' })
+      linkedName: async () => null,
+      queueRestoration: async () => ({ results:[],page:1,pageSize:10,total:0 })
     },
     tickets: {
       connectChannels() {},
@@ -216,7 +218,8 @@ test('retired custom Deliver button never sends a PIN or mutates a request', asy
 test('async feature failures log safe metadata and reply once with a generic message', async () => {
   const secretError = new Error('private database path C:\\secret\\db.sqlite');
   const { adapter, listeners, calls } = makeAdapter({
-    playerNames: { submit: async () => { throw secretError; }, verify: async () => ({}) }
+    playerNames: { submit: async () => { throw secretError; }, linkedName:async () => null,
+      queueRestoration:async () => ({ results:[],page:1,pageSize:10,total:0 }) }
   });
   await adapter.start();
   const interaction = baseInteraction({

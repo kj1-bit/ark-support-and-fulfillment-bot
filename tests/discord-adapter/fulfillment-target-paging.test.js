@@ -93,23 +93,15 @@ test('cross-map scan reaches the 26th map and pages trusted players without a ma
   assert.deepEqual(state.scans, [...Array.from({ length:26 }, (_,i) => `map-${i+1}`),
     ...Array.from({ length:26 }, (_,i) => `map-${i+1}`)]);
 });
-test('26th remembered staff linking candidate links without a map choice or live scan', async () => {
+test('26th remembered candidate remains available without a live scan', async () => {
   const state = setup(true);
-  const firstPlayers = await openMaps(state, true);
-  assert.equal(component(firstPlayers, 'Select a map'), undefined);
-  const secondPlayers = await next(state, firstPlayers);
-  const menu = component(secondPlayers, 'Select a remembered player');
-  assert.match(menu.options[0].description, /Last seen: Map 26/);
+  const context = { actorId,guildId,channelId };
+  const result = await state.onlinePlayers.scanPage({ context,remembered:true,page:2 });
+  assert.equal(result.players.length,1);
+  assert.equal(result.players[0].displayName,'Online Player 26');
   assert.deepEqual(state.scans, []);
-  await state.router.handle(interaction('select', menu.custom_id, [menu.options[0].value]));
-  assert.equal(state.associations.length, 1);
-  assert.equal(state.associations[0].discordId, targetId);
-  assert.equal(state.associations[0].eosId, state.observations[25].eosId);
-  assert.equal(state.associations[0].source, 'observed:map-26');
-  assert.equal(state.players.byDiscord(targetId).eosId, state.observations[25].eosId);
-  assert.throws(() => state.onlinePlayers.resolve(menu.options[0].value,
-    { actorId, guildId, channelId }, { allowUntrusted: true }), /no longer available/);
-  assert(state.capabilities.every(capability => capability === 'player-names.verify'));
+  assert.equal(state.onlinePlayers.resolve(result.players[0].playerRef,context,{ allowUntrusted:true }).eosId,
+    state.observations[25].eosId);
 });
 test('cross-map online-player paging remains actor/guild/channel/message-bound and restricted to displayed refs', async () => {
   const state = setup();

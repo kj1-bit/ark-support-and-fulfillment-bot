@@ -13,7 +13,8 @@ function createPinDirectoryService({ repository, protector, authorization, guild
       for (const row of result.results) {
         const pin = await protector.reveal(row.protectedPin);
         if (typeof pin !== 'string' || !/^\d{4}$/.test(pin)) throw new Error('Invalid PIN.');
-        results.push(Object.freeze({ userId: row.userId, playerName: row.playerName, pin }));
+        results.push(Object.freeze({ userId: row.userId, playerName: row.playerName,
+          linkedPlayerName: row.linkedPlayerName, pin }));
       }
       return Object.freeze({
         page: result.page, pageSize: result.pageSize, total: result.total, results: Object.freeze(results)

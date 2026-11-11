@@ -27,7 +27,8 @@ const authorization = { authorize:(capability,input) => authorize(policy,capabil
 const migrations = [
   require('../../src/migrations/001-v2-core'), require('../../src/migrations/002-trusted-state'),
   require('../../src/migrations/003-player-names'), require('../../src/migrations/004-tickets'),
-  require('../../src/migrations/005-pins'), require('../../src/migrations/013-vault-pins')
+  require('../../src/migrations/005-pins'), require('../../src/migrations/013-vault-pins'),
+  require('../../src/migrations/015-remembered-players')
 ];
 
 test('staff directory pages real encrypted Vault rows and names, never historical custom requests, across restart', async t => {
@@ -44,6 +45,15 @@ test('staff directory pages real encrypted Vault rows and names, never historica
       guildId:GUILD,userId:userId(i),protectedPin:await protector.protect(String(5800+i)),source:'STAFF_BULK',createdAt:0,updatedAt:0
     });
   }
+  await database.run(`INSERT INTO trusted_players
+    (discord_id,eos_id,display_name,verified_at,source) VALUES (?,?,?,?,?)`,
+  [userId(1),'a'.repeat(32),'Old name',1,'test']);
+  await database.run(`INSERT INTO remembered_players
+    (eos_id,display_name,server_id,last_seen_at) VALUES (?,?,?,?)`,
+  ['a'.repeat(32),'Renamed player','test-map',2]);
+  await database.run(`INSERT INTO trusted_players
+    (discord_id,eos_id,display_name,verified_at,source) VALUES (?,?,?,?,?)`,
+  [userId(2),'b'.repeat(32),'Trusted fallback',1,'test']);
   await repository.insertIfAbsent({
     guildId:'30000000000000001',userId:ACTOR,protectedPin:await protector.protect('6782'),source:'SELF_SERVICE',createdAt:0,updatedAt:0
   });
@@ -63,7 +73,9 @@ test('staff directory pages real encrypted Vault rows and names, never historica
   assert.equal(first.total,23);
   assert.equal(first.results.length,10);
   assert.equal(reveals,10);
-  assert.deepEqual(first.results[0],{ userId:userId(0),playerName:'Survivor 0',pin:'5800' });
+  assert.deepEqual(first.results[0],{ userId:userId(0),playerName:'Survivor 0',linkedPlayerName:null,pin:'5800' });
+  assert.equal(first.results[1].linkedPlayerName,'Renamed player');
+  assert.equal(first.results[2].linkedPlayerName,'Trusted fallback');
   assert(!JSON.stringify(first).includes('protectedPin'));
   const second = await service.staff.page({ context,page:2 });
   const third = await service.staff.page({ context,page:3 });

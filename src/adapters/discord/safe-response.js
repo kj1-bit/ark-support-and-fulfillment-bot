@@ -7,7 +7,9 @@ function safeInteractionMessage(error) {
     IDENTITY_ALREADY_LINKED: 'This in-game identity is already linked. Use Unlink Player on its current Discord member first.',
     PLAYER_NOT_LINKED: 'This Discord member has no linked in-game identity.',
     LINK_CHANGED: 'This link has changed. Start Unlink Player again.',
-    INVALID_LINK_EOS: 'EOS ID must contain exactly 32 hexadecimal characters.'
+    INVALID_LINK_EOS: 'EOS ID must contain exactly 32 hexadecimal characters.',
+    REQUEST_CHANGED: 'The request changed. Start Link Player again.',
+    NAME_ALREADY_LINKED: 'You are already linked. Ask staff to unlink you first.'
   };
   if (Object.hasOwn(linkMessages, error?.code)) return linkMessages[error.code];
   if (error?.code === 'TICKET_ALREADY_OPEN') {

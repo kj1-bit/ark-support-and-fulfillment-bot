@@ -102,9 +102,11 @@ function pinPagePayload(panel, result) {
     embeds: [{
       title: `Vault PIN directory \u00b7 page ${page}`,
       description: result.results.length ? result.results.map(row => {
-        const name = escapeMarkdown(String(row.playerName || 'Name unavailable').slice(0, 80)
+        const name = escapeMarkdown(String(row.linkedPlayerName || row.playerName || 'Name unavailable').slice(0, 80)
           .replace(/[\r\n<>]/g, ' ').replace(/@/g, '@\u200b'), { maskedLink: true });
-        return `**${name}** \u00b7 <@${row.userId}>\nVault PIN: hidden`;
+        const identity = row.linkedPlayerName ? `In-game name: **${name}**`
+          : `Not linked \u00b7 said: **${name}**`;
+        return `<@${row.userId}> \u00b7 ${identity}\nVault PIN: hidden`;
       }).join('\n\n') : 'No generated Vault PINs yet.',
       color: 0x5865f2
     }]

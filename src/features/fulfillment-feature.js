@@ -22,7 +22,7 @@ function createFulfillmentFeature() {
       panel = createPersistentPanel({ key: 'fulfillment-panel', channelId, payload: views.fulfillmentPanelView() });
       router = createDiscordRouter({ controller, views, logSink: context.logSink, config: context.config,
         panelMatches: interaction => Boolean(panel?.matches(interaction)),
-        handlePlayerLink: context.config.features?.playerNames !== true });
+        handlePlayerLink: false });
     },
     async register(context) {
       listener = registerInteractionListener(context, 'fulfillment', interaction => router.handle(interaction));

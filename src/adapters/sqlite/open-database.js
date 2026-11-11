@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { AsyncLocalStorage } = require('node:async_hooks');
 
 function openSqliteDatabase(databasePath, options = {}) {
   if (typeof databasePath !== 'string' || !databasePath.trim()) {
@@ -49,39 +50,62 @@ function openSqliteDatabase(databasePath, options = {}) {
 
 function createDatabaseInterface(connection) {
   let closed = false;
-  return Object.freeze({
+  let pending = Promise.resolve();
+  const transactionScope = new AsyncLocalStorage();
+  const schedule = operation => {
+    if (transactionScope.getStore() === true) return operation();
+    const result = pending.then(operation);
+    pending = result.catch(() => {});
+    return result;
+  };
+  const database = {
     executeSql(sql) {
       // sqlite3's run() executes a single statement; migrations must issue one statement per call.
-      return new Promise((resolve, reject) => {
+      return schedule(() => new Promise((resolve, reject) => {
         connection.run(sql, error => error ? reject(error) : resolve());
-      });
+      }));
     },
     all(sql, parameters = []) {
-      return new Promise((resolve, reject) => {
+      return schedule(() => new Promise((resolve, reject) => {
         connection.all(sql, parameters, (error, rows) => error ? reject(error) : resolve(rows));
-      });
+      }));
     },
     get(sql, parameters = []) {
-      return new Promise((resolve, reject) => {
+      return schedule(() => new Promise((resolve, reject) => {
         connection.get(sql, parameters, (error, row) => error ? reject(error) : resolve(row));
-      });
+      }));
     },
     run(sql, parameters = []) {
-      return new Promise((resolve, reject) => {
+      return schedule(() => new Promise((resolve, reject) => {
         connection.run(sql, parameters, function onRun(error) {
           if (error) reject(error);
           else resolve(Object.freeze({ changes: this.changes, lastID: this.lastID }));
         });
-      });
+      }));
+    },
+    transaction(operation) {
+      if (transactionScope.getStore() === true) throw new Error('Nested transactions are not supported.');
+      return schedule(() => transactionScope.run(true, async () => {
+        await database.executeSql('BEGIN IMMEDIATE');
+        try {
+          const result = await operation(database);
+          await database.executeSql('COMMIT');
+          return result;
+        } catch (error) {
+          await database.executeSql('ROLLBACK').catch(() => {});
+          throw error;
+        }
+      }));
     },
     close() {
       if (closed) return Promise.resolve();
       closed = true;
-      return new Promise((resolve, reject) => {
+      return schedule(() => new Promise((resolve, reject) => {
         connection.close(error => error ? reject(error) : resolve());
-      });
+      }));
     }
-  });
+  };
+  return Object.freeze(database);
 }
 
 module.exports = { createDatabaseInterface, openSqliteDatabase };

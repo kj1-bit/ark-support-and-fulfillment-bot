@@ -16,6 +16,14 @@ function createRememberedPlayerRepository(database) {
         server_id AS serverId, last_seen_at AS lastSeenAt FROM remembered_players
         ORDER BY last_seen_at DESC, eos_id LIMIT 25 OFFSET ?`, [(current - 1) * 25]);
       return { players, total, page: current, pageSize: 25 };
+    },
+    async matching(name) {
+      const escaped = String(name).replace(/[\\%_]/g, '\\$&');
+      return database.all(`SELECT eos_id AS eosId,display_name AS displayName,server_id AS serverId,
+        last_seen_at AS lastSeenAt FROM remembered_players
+        WHERE display_name LIKE ? ESCAPE '\\'
+        ORDER BY CASE WHEN display_name = ? COLLATE NOCASE THEN 0 ELSE 1 END,
+          last_seen_at DESC,eos_id LIMIT 25`, [`%${escaped}%`,name]);
     }
   });
 }

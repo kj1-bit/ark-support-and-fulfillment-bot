@@ -20,7 +20,7 @@ function panel(result) {
   return { embeds:[{ title:`Player name requests · page ${result.page}`,
     description:result.results.length ? result.results.map(mention).join('\n\n') : 'No player name requests awaiting a link.',
     color:0x5865f2 }], allowedMentions:{ parse:[] }, components:[row([
-    button('v2:name-requests:link', 'Link Player', !result.total, 1),
+    button('v2:name-requests:link', 'Link Player', false, 1),
     button('v2:name-requests:unlink', 'Unlink Player'),
     button(`v2:name-requests:previous:${Math.max(1, result.page - 1)}`, 'Previous', result.page <= 1),
     button(`v2:name-requests:next:${Math.min(last, result.page + 1)}`, 'Next', result.page >= last),
@@ -29,21 +29,28 @@ function panel(result) {
 }
 function picker(result, token) {
   const last = Math.max(1, Math.ceil(result.total / result.pageSize));
+  const any = `${result.results.length + 1}. Select any user`;
   return { content:result.results.length
-    ? `Select a request to link · page ${result.page}\n${result.results.map((r,i) => `${i + 1}. ${mention(r)}`).join('\n')}`
-    : 'No player name requests awaiting a link.', allowedMentions:{ parse:[] }, embeds:[], components:[
-    ...(result.results.length ? [row([select(id('request', token), 'Select a request', result.results.map((r,i) => ({
+    ? `Select a request to link · page ${result.page}\n${result.results.map((r,i) => `${i + 1}. ${mention(r)}`).join('\n')}\n${any}`
+    : `No player name requests awaiting a link.\n${any}`, allowedMentions:{ parse:[] }, embeds:[], components:[
+    row([select(id('request', token), 'Select a request', [...result.results.map((r,i) => ({
       label:label(`${i + 1}. ${r.playerName}`), value:r.discordId
-    })))])] : []),
+    })), { label:any, value:'any' }])]),
     row([button(id('previous', token), 'Previous', result.page <= 1),
       button(id('next', token), 'Next', result.page >= last), button(id('close', token), 'Cancel')])
   ] };
 }
+function memberPicker(token) {
+  return { content:'Select the Discord member to link to an in-game player.',
+    allowedMentions:{ parse:[] }, embeds:[], components:[
+      row([select(id('link-member',token),'Select a Discord member',null,5)]),row([button(id('close',token),'Cancel')])] };
+}
 function candidates(request, result, token, browsing) {
   const last = Math.max(1, Math.ceil(result.total / result.pageSize));
   const intro = browsing ? 'Browse all remembered players' : 'Matching remembered players';
-  return { content:`${intro} for <@${request.discordId}>, who said "${safe(request.playerName)}".`
-    + (result.players.length ? '' : ' No matching remembered players found.')
+  return { content:`${intro} for <@${request.discordId}>`
+    + (request.playerName ? `, who said "${safe(request.playerName)}".` : '.')
+    + (result.players.length ? '' : ` No ${browsing ? '' : 'matching '}remembered players found.`)
     + (browsing ? ` · page ${result.page}` : ''), allowedMentions:{ parse:[] }, embeds:[], components:[
     ...(result.players.length ? [row([select(id('candidate',token), 'Select a remembered player', result.players.map(p => ({
       label:label(p.displayName), value:p.playerRef,
@@ -51,19 +58,23 @@ function candidates(request, result, token, browsing) {
     })))])] : []),
     ...(browsing ? [row([button(id('previous',token),'Previous',result.page <= 1),
       button(id('next',token),'Next',result.page >= last)])] : []),
-    row([button(id('refresh',token),'Refresh'), button(id('browse',token),browsing ? 'Matching Players' : 'Browse All Remembered Players'),
+    row([button(id('refresh',token),'Refresh'),
+      ...(request.playerName ? [button(id('browse',token),browsing ? 'Matching Players' : 'Browse All Remembered Players')] : []),
       button(id('manual',token),'Enter EOS Manually'), button(id('close',token),'Cancel')])
   ] };
 }
 function manual(token, name) {
+  const nameInput = new TextInputBuilder().setCustomId('player-name').setLabel('In-game player name')
+    .setStyle(TextInputStyle.Short).setMinLength(2).setMaxLength(32).setRequired(true);
+  if (name) nameInput.setValue(name);
   return new ModalBuilder().setCustomId(id('manual-submit',token)).setTitle('Link Player Manually').addComponents(
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('player-name').setLabel('In-game player name')
-      .setStyle(TextInputStyle.Short).setMinLength(2).setMaxLength(32).setRequired(true).setValue(name)),
+    new ActionRowBuilder().addComponents(nameInput),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('eos-id').setLabel('EOS ID (32 hexadecimal characters)')
       .setStyle(TextInputStyle.Short).setMinLength(32).setMaxLength(32).setRequired(true)));
 }
 function review(request, player, token) {
-  return { content:`Review link for <@${request.discordId}>.\nThey said: **${safe(request.playerName)}**\n`
+  return { content:`Review link for <@${request.discordId}>.\n`
+    + (request.playerName ? `They said: **${safe(request.playerName)}**\n` : 'No name request: their in-game name will be verified as shown.\n')
     + `In-game player: **${safe(player.displayName)}**\nEOS: ${mask(player.eosId)}\n${lastSeen(player)}`,
   allowedMentions:{ parse:[] }, embeds:[], components:[row([
     button(id('confirm',token),'Confirm Link',false,3), button(id('close',token),'Cancel')])] };
@@ -79,4 +90,4 @@ function unlinkReview(player, token) {
   allowedMentions:{ parse:[] }, embeds:[], components:[row([
     button(id('unlink-confirm',token),'Confirm Unlink',false,4),button(id('close',token),'Cancel')])] };
 }
-module.exports = { safe, panel, picker, candidates, manual, review, unlinkPicker, unlinkReview };
+module.exports = { safe, panel, picker, memberPicker, candidates, manual, review, unlinkPicker, unlinkReview };

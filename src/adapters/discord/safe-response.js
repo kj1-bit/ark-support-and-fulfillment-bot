@@ -9,6 +9,7 @@ function safeInteractionMessage(error) {
     LINK_CHANGED: 'This link has changed. Start Unlink Player again.',
     INVALID_LINK_EOS: 'EOS ID must contain exactly 32 hexadecimal characters.',
     REQUEST_CHANGED: 'The request changed. Start Link Player again.',
+    NAME_REQUESTED: 'This in-game name is already requested by another Discord member. Link that request instead.',
     NAME_ALREADY_LINKED: 'You are already linked. Ask staff to unlink you first.'
   };
   if (Object.hasOwn(linkMessages, error?.code)) return linkMessages[error.code];

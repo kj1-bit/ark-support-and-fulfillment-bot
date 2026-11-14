@@ -238,6 +238,7 @@ async function composeRuntime(options = {}) {
       return linked ? { ...record, playerName:linked.displayName } : record;
     },
     linkedName: playerNameRepository.linkedName,
+    findRequest: playerNameRepository.findByDiscord,
     queueRestoration: playerNameRepository.queue,
     async queue({ page = 1, context }) {
       authorization.authorize('player-names.verify', context);

@@ -76,11 +76,26 @@ function createOnlinePlayerSelectionService({ players, ark, rememberedPlayers, a
     }
     const targets = serverIds === undefined ? [serverId] : [...new Set(serverIds)];
     const list = [];
-    // Scan sequentially to bound RCON load; any failed map fails the scan rather than hiding players.
+    const unavailableServerIds = [];
+    let firstError;
+    // Scan sequentially to bound RCON load; report failures without hiding successful maps.
     for (const target of targets) {
-      list.push(...(await observed(target)).filter(player => includeUntrusted || player.trusted));
+      try {
+        list.push(...(await observed(target)).filter(player => includeUntrusted || player.trusted));
+      } catch (error) {
+        if (serverIds === undefined) throw error;
+        if (unavailableServerIds.length === 0) firstError = error;
+        unavailableServerIds.push(target);
+      }
     }
-    return selectionPage({ context, ttlMs, list, page });
+    if (targets.length && unavailableServerIds.length === targets.length) {
+      const error = new Error('All online-player map scans failed.', { cause: firstError });
+      error.code = 'ONLINE_PLAYER_MAPS_UNAVAILABLE';
+      throw error;
+    }
+    const result = selectionPage({ context, ttlMs, list, page });
+    return serverIds === undefined ? result : Object.freeze({ ...result,
+      unavailableServerIds: Object.freeze(unavailableServerIds) });
   }
   return Object.freeze({
     async scan(input) { return (await scanPage({ ...input, page: 1 })).players; },

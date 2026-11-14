@@ -22,7 +22,7 @@ function interaction(kind, customId, values = [], overrides = {}) {
     editReply: async payload => ({ ...payload, id: privateId }), ...overrides };
   return i;
 }
-function setup(linking = false) {
+function setup(linking = false, unavailable = []) {
   const observations = Array.from({ length: 26 }, (_, index) => ({
     eosId: (index + 1).toString(16).padStart(32, '0'), displayName: `Online Player ${index + 1}`
   }));
@@ -35,7 +35,11 @@ function setup(linking = false) {
     audit:{ write() {} },
     rememberedPlayers: { remember:async () => {}, page: async page => ({ players:observations.slice((page-1)*25,page*25).map(player => ({
       ...player,serverId:'map-26' })),page,total:observations.length }) },
-    ark: { listOnlinePlayers: async serverId => { scans.push(serverId); return serverId === 'map-26' ? observations : []; } },
+    ark: { listOnlinePlayers: async serverId => {
+      scans.push(serverId);
+      if (unavailable.includes(serverId)) throw new Error('transport failure');
+      return serverId === 'map-26' ? observations : [];
+    } },
     uuid: () => `observed-reference-${++nextRef}` });
   const catalog = { version: 'current', creatures: [{ id: 'rex', name: 'Rex', enabled: true, tameable: true }],
     get: id => { assert.equal(id, 'rex'); return catalog.creatures[0]; } };
@@ -162,6 +166,42 @@ test('cross-map refs retain server identity for identical names, exclude unverif
   moved = true;
   assert.equal((await online.revalidate({ playerRef:refreshed.players[0].playerRef,serverId:'map-one',eosId })).online,false);
   fail = true;
-  await assert.rejects(online.scanPage({ context,serverIds:['map-one','map-two'] }),/scan unavailable/);
+  moved = false;
+  const partial = await online.scanPage({ context,serverIds:['map-one','map-two'] });
+  assert.deepEqual(partial.unavailableServerIds,['map-two']);
+  assert.deepEqual(partial.players.map(player => player.serverId),['map-one']);
+  await assert.rejects(online.scanPage({ context,serverId:'map-two' }),/scan unavailable/);
   assert.equal((await online.scanPage({ context,serverIds:[] })).total,0);
+});
+
+test('partial map failures show configured names while retaining players and pagination', async () => {
+  const state = setup(false, ['map-1', 'map-2']);
+  const first = await openMaps(state);
+  assert.match(first.content, /Unable to scan maps: Map 1, Map 2\./);
+  assert.equal(component(first, 'Select an online player').options.length, 25);
+  const second = await next(state, first);
+  assert.match(second.content, /Unable to scan maps: Map 1, Map 2\./);
+  assert.equal(component(second, 'Select an online player').options.length, 1);
+});
+
+test('all map failures return a safe error while single-map scans and revalidation remain fail-closed', async () => {
+  const state = setup(false, Array.from({ length: 26 }, (_, index) => `map-${index + 1}`));
+  const context = { actorId, guildId, channelId };
+  await assert.rejects(state.onlinePlayers.scanPage({ context, serverIds:['map-1','map-2'] }),
+    error => error.code === 'ONLINE_PLAYER_MAPS_UNAVAILABLE' && error.cause.message === 'transport failure');
+  await assert.rejects(state.onlinePlayers.scanPage({ context, serverId:'map-1' }), /transport failure/);
+  const result = await openMaps(state);
+  assert.equal(result.content, 'No fulfillment maps could be scanned right now. Please try again later.');
+
+  const player = { eosId:'a'.repeat(32), discordId:targetId, displayName:'Player', verified:true };
+  let unavailable = false;
+  const online = createOnlinePlayerSelectionService({ players:createPlayerRegistry([player]),
+    ark:{ listOnlinePlayers:async () => {
+      if (unavailable) throw new Error('transport failure');
+      return [player];
+    } } });
+  const selection = await online.scanPage({ context, serverId:'map-1' });
+  unavailable = true;
+  await assert.rejects(online.revalidate({ playerRef:selection.players[0].playerRef,
+    serverId:'map-1', eosId:player.eosId }), /transport failure/);
 });

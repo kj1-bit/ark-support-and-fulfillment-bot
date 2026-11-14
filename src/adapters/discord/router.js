@@ -80,13 +80,16 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
       { ...(data.linking ? {} : { serverIds: allowedServers().map(server => server.id) }),
         ttlMs: FLOW_TTL_MS, linking: data.linking === true, page: data.playerPage || 1 });
     const players = result.players;
+    const unavailableNames = (result.unavailableServerIds || []).map(id =>
+      config.ark?.servers?.find(server => server.id === id)?.name || id);
     return render(interaction, { ...data, stage: 'players', playerPage: result.page,
       playerTotal: result.total ?? players.length, playerRefs: players.map(player => player.playerRef),
       playerServers: Object.fromEntries(players.map(player => [player.playerRef, player.serverId])) },
       token => views.playerSelectionView({
         content: data.linking ? `Link Player for <@${data.discordId}>: Select a remembered player (online or offline), newest first.`
           + (players.length ? '' : ' No remembered players found. Use Enter Player Manually.')
-          : players.length ? 'Select a verified online player.' : 'No eligible online players found.',
+          : (players.length ? 'Select a verified online player.' : 'No eligible online players found.')
+            + (unavailableNames.length ? ` Unable to scan maps: ${unavailableNames.join(', ')}.` : ''),
         customId: `v2:fulfillment:${data.linking ? 'link' : 'select'}:${token}`,
         players: players.map(player => ({ ...player,
           serverName: config.ark?.servers?.find(server => server.id === player.serverId)?.name || player.serverId })),

@@ -77,9 +77,11 @@ function executeCommand({ Rcon, server, password, command, timeoutMs }) {
       settled = true;
       clearTimeout(timeout);
       try {
-        client?.disconnect();
+        // rcon 1.1.0 disconnect() only half-closes its owned TCP socket.
+        if (client?._tcpSocket) client._tcpSocket.destroy();
+        else client?.disconnect();
       } catch {
-        // Disconnect errors do not change the completed operation result.
+        // Disposal errors do not change the completed operation result.
       }
       if (error) reject(error);
       else resolve(response);
@@ -88,7 +90,7 @@ function executeCommand({ Rcon, server, password, command, timeoutMs }) {
     try {
       client = new Rcon(server.host, server.port, password, { tcp: true, challenge: false });
       client.once('auth', () => {
-        if (authenticated) return;
+        if (settled || authenticated) return;
         authenticated = true;
         try {
           client.send(command);

@@ -13,6 +13,9 @@ function safeInteractionMessage(error) {
     NAME_ALREADY_LINKED: 'You are already linked. Ask staff to unlink you first.'
   };
   if (Object.hasOwn(linkMessages, error?.code)) return linkMessages[error.code];
+  if (error?.code === 'ONLINE_PLAYER_MAPS_UNAVAILABLE') {
+    return 'No fulfillment maps could be scanned right now. Please try again later.';
+  }
   if (error?.code === 'TICKET_ALREADY_OPEN') {
     const channel = /^[1-9][0-9]{16,19}$/.test(error.ticketChannelId || '')
       ? ` <#${error.ticketChannelId}>` : ' creation is in progress.';

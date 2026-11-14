@@ -62,8 +62,24 @@ function rememberedPlayerDescription(player) {
     ? 'Previously linked' : `Last seen: ${player.serverName || player.serverId}`;
   return `EOS ${player.maskedEos} - ${status}`;
 }
-function playerSelectionView({ content, customId, players, token, linking, page, total, pageSize, showBack = true }) {
-  return { content: `${content}${page ? ` — Page ${page}` : ''}`, allowedMentions: { parse: [] }, components: [
+function playerSelectionView({ content, customId, players, token, linking, page, total, pageSize, showBack = true,
+  unavailableNames = [] }) {
+  const pageSuffix = page ? ` — Page ${page}` : '';
+  if (unavailableNames.length) {
+    const prefix = ' Unable to scan maps: ';
+    const names = [];
+    for (const name of unavailableNames) {
+      const candidate = [...names, name];
+      const remaining = unavailableNames.length - candidate.length;
+      const ending = remaining ? `, and ${remaining} more.` : '.';
+      if ((content + prefix + candidate.join(', ') + ending + pageSuffix).length > 2000) break;
+      names.push(name);
+    }
+    const remaining = unavailableNames.length - names.length;
+    content += names.length ? prefix + names.join(', ') + (remaining ? `, and ${remaining} more.` : '.')
+      : ` Unable to scan ${remaining} ${remaining === 1 ? 'map' : 'maps'} (names omitted).`;
+  }
+  return { content: `${content}${pageSuffix}`, allowedMentions: { parse: [] }, components: [
     ...(players.length ? [row([select(customId, linking ? 'Select a remembered player' : 'Select an online player',
       players.slice(0, 25).map(player => ({ label: safeText(player.displayName),
         value: player.playerRef, description: safeText(linking

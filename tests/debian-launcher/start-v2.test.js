@@ -3,6 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
+const net = require('node:net');
+const Rcon = require('rcon');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -79,6 +81,134 @@ test('live RCON ignores late socket errors, fails fast on a closed connection, a
     await createRconTransport({ mode: 'test', env, timeoutMs: 1000, RconClass: RejectingRcon }).execute(operation),
     { success: false }
   );
+});
+
+test('real RCON releases native TCP sockets even when the local peer remains half-open', async t => {
+  function packet(id, type, body = '') {
+    const bytes = Buffer.from(body);
+    const result = Buffer.alloc(bytes.length + 14);
+    result.writeInt32LE(bytes.length + 10, 0);
+    result.writeInt32LE(id, 4);
+    result.writeInt32LE(type, 8);
+    bytes.copy(result, 12);
+    return result;
+  }
+
+  for (const outcome of ['success', 'success', 'rejected', 'timeout', 'error', 'oversize', 'end']) {
+    await t.test(outcome, async t => {
+      const peers = new Set();
+      const commands = [];
+      let nativeSocket;
+      let closed;
+      let client;
+      const listener = net.createServer({ allowHalfOpen: true }, socket => {
+        peers.add(socket);
+        socket.on('error', () => {});
+        socket.on('close', () => peers.delete(socket));
+        let pending = Buffer.alloc(0);
+        socket.on('data', bytes => {
+          pending = Buffer.concat([pending, bytes]);
+          while (pending.length >= 4 && pending.length >= pending.readInt32LE(0) + 4) {
+            const length = pending.readInt32LE(0) + 4;
+            const message = pending.subarray(0, length);
+            pending = pending.subarray(length);
+            const id = message.readInt32LE(4);
+            const type = message.readInt32LE(8);
+            if (type === 3) {
+              if (outcome === 'error') socket.write(packet(-1, 2));
+              else if (outcome === 'end') socket.end();
+              else socket.write(packet(id, 2));
+            } else {
+              commands.push(message.toString('utf8', 12, length - 2));
+              if (outcome !== 'timeout') {
+                const body = outcome === 'oversize' ? 'x'.repeat(65537)
+                  : outcome === 'rejected' ? 'Error: unknown command' : '';
+                socket.write(packet(id, 0, body));
+              }
+            }
+          }
+        });
+      });
+      t.after(async () => {
+        nativeSocket?.destroy();
+        for (const peer of peers) peer.destroy();
+        await new Promise(resolve => listener.close(resolve));
+      });
+      await new Promise((resolve, reject) => {
+        listener.once('error', reject);
+        listener.listen(0, '127.0.0.1', resolve);
+      });
+      class ObservedRcon extends Rcon {
+        connect() {
+          client = this;
+          super.connect();
+          nativeSocket = this._tcpSocket;
+          closed = new Promise(resolve => nativeSocket.once('close', resolve));
+        }
+      }
+      const transport = createRconTransport({
+        mode: 'test', env: { ARK_SECRET: 'local-fixture' }, timeoutMs: 1000, RconClass: ObservedRcon
+      });
+      const request = transport.execute({
+        type: 'fulfillApprovedCreature',
+        server: { id: 'local-fixture', host: '127.0.0.1', port: listener.address().port, passwordSecret: 'ARK_SECRET' },
+        operation: { command: 'fixture-command' }
+      });
+      if (outcome === 'success' || outcome === 'rejected') {
+        assert.deepEqual(await request, { success: outcome === 'success' });
+      } else {
+        await assert.rejects(request, outcome === 'timeout' ? /timed out/
+          : outcome === 'oversize' ? /size limit/ : outcome === 'end' ? /connection closed/ : /request failed/);
+      }
+      let deadline;
+      try {
+        await Promise.race([
+          closed,
+          new Promise((_, reject) => {
+            deadline = setTimeout(() => reject(new Error('Native RCON socket did not close after settlement.')), 1000);
+          })
+        ]);
+      } finally {
+        clearTimeout(deadline);
+      }
+      assert.equal(nativeSocket.destroyed, true);
+      assert.deepEqual(commands, outcome === 'error' || outcome === 'end' ? [] : ['fixture-command']);
+      assert.doesNotThrow(() => {
+        client.emit('error', new Error('late-fixture-error'));
+        client.emit('response', 'late-response');
+        client.emit('end');
+      });
+    });
+  }
+});
+
+test('timed-out RCON ignores late authentication and settles only once despite late events', async () => {
+  let client;
+  let sends = 0;
+  let disconnects = 0;
+  class DelayedAuthRcon extends EventEmitter {
+    constructor() { super(); client = this; }
+    connect() {}
+    send() { sends += 1; }
+    disconnect() { disconnects += 1; }
+  }
+  const request = createRconTransport({
+    mode: 'test', env: { ARK_SECRET: 'local-fixture' }, timeoutMs: 1000, RconClass: DelayedAuthRcon
+  }).execute({
+    type: 'fulfillApprovedCreature',
+    server: { id: 'local-fixture', host: '127.0.0.1', port: 27020, passwordSecret: 'ARK_SECRET' },
+    operation: { command: 'must-not-send' }
+  });
+  await assert.rejects(request, /timed out/);
+  assert.doesNotThrow(() => {
+    client.emit('auth');
+    client.emit('error', new Error('late-fixture-error'));
+    client.emit('response', '');
+    client.emit('end');
+  });
+  assert.equal(sends, 0);
+  assert.equal(disconnects, 1);
+  await assert.rejects(request, /timed out/);
 });
 
 test('default Discord client can observe message deletions of uncached panels', () => {

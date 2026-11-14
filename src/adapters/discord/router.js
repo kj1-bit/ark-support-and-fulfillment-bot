@@ -88,8 +88,8 @@ function createDiscordRouter({ controller, views, logSink, uuid = crypto.randomU
       token => views.playerSelectionView({
         content: data.linking ? `Link Player for <@${data.discordId}>: Select a remembered player (online or offline), newest first.`
           + (players.length ? '' : ' No remembered players found. Use Enter Player Manually.')
-          : (players.length ? 'Select a verified online player.' : 'No eligible online players found.')
-            + (unavailableNames.length ? ` Unable to scan maps: ${unavailableNames.join(', ')}.` : ''),
+          : players.length ? 'Select a verified online player.' : 'No eligible online players found.',
+        unavailableNames,
         customId: `v2:fulfillment:${data.linking ? 'link' : 'select'}:${token}`,
         players: players.map(player => ({ ...player,
           serverName: config.ark?.servers?.find(server => server.id === player.serverId)?.name || player.serverId })),

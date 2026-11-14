@@ -22,7 +22,7 @@ function interaction(kind, customId, values = [], overrides = {}) {
     editReply: async payload => ({ ...payload, id: privateId }), ...overrides };
   return i;
 }
-function setup(linking = false, unavailable = []) {
+function setup(linking = false, unavailable = [], mapName = index => `Map ${index + 1}`) {
   const observations = Array.from({ length: 26 }, (_, index) => ({
     eosId: (index + 1).toString(16).padStart(32, '0'), displayName: `Online Player ${index + 1}`
   }));
@@ -54,7 +54,7 @@ function setup(linking = false, unavailable = []) {
     playerNames: { verify: async () => ({}) }
   };
   const servers = Array.from({ length: 26 }, (_, index) => ({
-    id: `map-${index + 1}`, name: `Map ${index + 1}`, enabled: true,
+    id: `map-${index + 1}`, name: mapName(index), enabled: true,
     operations: ['listOnlinePlayers', 'fulfillApprovedCreature']
   }));
   const router = createDiscordRouter({ controller: createFulfillmentController({ services }), views,
@@ -182,6 +182,25 @@ test('partial map failures show configured names while retaining players and pag
   const second = await next(state, first);
   assert.match(second.content, /Unable to scan maps: Map 1, Map 2\./);
   assert.equal(component(second, 'Select an online player').options.length, 1);
+});
+
+test('long unavailable map names do not exceed Discord content limits or hide the picker', async () => {
+  const unavailable = Array.from({ length: 25 }, (_, index) => `map-${index + 1}`);
+  const state = setup(false, unavailable, index => `Map ${index + 1} ${'x'.repeat(250)}`);
+  const first = await openMaps(state);
+  assert.ok(first.content.length <= 2000);
+  assert.match(first.content, /^Select a verified online player\. Unable to scan maps: Map 1 /);
+  assert.match(first.content, /, and \d+ more\. — Page 1$/);
+  assert.equal(component(first, 'Select an online player').options.length, 25);
+  const second = await next(state, first);
+  assert.ok(second.content.length <= 2000);
+  assert.match(second.content, /, and \d+ more\. — Page 2$/);
+  assert.equal(component(second, 'Select an online player').options.length, 1);
+  const oversized = setup(false, ['map-1'], index => index === 0 ? 'x'.repeat(3000) : `Map ${index + 1}`);
+  const view = await openMaps(oversized);
+  assert.ok(view.content.length <= 2000);
+  assert.match(view.content, /Unable to scan 1 map \(names omitted\)\./);
+  assert.equal(component(view, 'Select an online player').options.length, 25);
 });
 
 test('all map failures return a safe error while single-map scans and revalidation remain fail-closed', async () => {

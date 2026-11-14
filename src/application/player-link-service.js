@@ -37,7 +37,8 @@ function createPlayerLinkService({ repository, players, audit, clock = Date.now 
           throw new TypeError('Player name contains unsupported characters or length.');
         }
         assertUnlinked(discordId, eosId);
-        if (!request || typeof request.playerName !== 'string' || !Number.isFinite(request.updatedAt)) {
+        // request === null links a member who has no name request; a VERIFIED name entry is created for them.
+        if (request !== null && (!request || typeof request.playerName !== 'string' || !Number.isFinite(request.updatedAt))) {
           throw linkError('REQUEST_CHANGED', 'The request changed. Start Link Player again.');
         }
         const record = Object.freeze({ discordId, eosId: eosId.toLowerCase(), displayName: name,

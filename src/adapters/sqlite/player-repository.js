@@ -20,10 +20,22 @@ function createSqlitePlayerRepository(database) {
     async approve(r, request, moderatorId, expiresAt) {
       return database.transaction(async () => {
         if (expiresAt !== undefined && Date.now() >= expiresAt) throw new Error('This selection flow is invalid or expired.');
-        const updated = await database.run(`UPDATE player_names SET status='VERIFIED',moderator_id=?,
-          verified_at=?,updated_at=MAX(?,updated_at+1) WHERE discord_id=? AND player_name=? COLLATE BINARY AND updated_at=?
-          AND NOT EXISTS (SELECT 1 FROM trusted_players WHERE discord_id=?)`,
-        [moderatorId,r.verifiedAt,r.verifiedAt,r.discordId,request.playerName,request.updatedAt,r.discordId]);
+        let updated;
+        if (request) {
+          updated = await database.run(`UPDATE player_names SET status='VERIFIED',moderator_id=?,
+            verified_at=?,updated_at=MAX(?,updated_at+1) WHERE discord_id=? AND player_name=? COLLATE BINARY AND updated_at=?
+            AND NOT EXISTS (SELECT 1 FROM trusted_players WHERE discord_id=?)`,
+          [moderatorId,r.verifiedAt,r.verifiedAt,r.discordId,request.playerName,request.updatedAt,r.discordId]);
+        } else {
+          const taken = await database.get('SELECT discord_id AS discordId FROM player_names WHERE player_name=? COLLATE NOCASE', [r.displayName]);
+          if (taken && taken.discordId !== r.discordId) {
+            throw Object.assign(new Error('This in-game name is already requested by another Discord member.'), { code:'NAME_REQUESTED' });
+          }
+          updated = await database.run(`INSERT INTO player_names (discord_id,player_name,status,moderator_id,verified_at,updated_at)
+            SELECT ?,?,'VERIFIED',?,?,? WHERE NOT EXISTS (SELECT 1 FROM player_names WHERE discord_id=?)
+            AND NOT EXISTS (SELECT 1 FROM trusted_players WHERE discord_id=?)`,
+          [r.discordId,r.displayName,moderatorId,r.verifiedAt,r.verifiedAt,r.discordId,r.discordId]);
+        }
         if (updated.changes !== 1) throw Object.assign(new Error('The request changed. Start Link Player again.'), { code:'REQUEST_CHANGED' });
         const existing = await database.get('SELECT 1 AS linked FROM trusted_players WHERE eos_id=? COLLATE NOCASE', [r.eosId]);
         if (existing) throw Object.assign(new Error('This in-game identity is already linked.'), { code:'IDENTITY_ALREADY_LINKED' });

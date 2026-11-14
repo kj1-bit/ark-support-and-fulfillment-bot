@@ -108,6 +108,11 @@ function createNameLinkRouter(context, panel) {
         : showCandidates(interaction,user,{ ...flow,page });
     }
     if (action === 'request' && isStringSelect(interaction) && flow.stage === 'requests') {
+      if (interaction.values?.[0] === 'any') {
+        flows.delete(token);
+        await interaction.deferUpdate();
+        return render(interaction, { stage:'link-member' }, views.memberPicker);
+      }
       const request = flow.requests.find(item => item.discordId === interaction.values?.[0]);
       if (!request) throw new Error('This selection is invalid.');
       context.services.playerLinks.assertUnlinked(request.discordId);
@@ -115,7 +120,18 @@ function createNameLinkRouter(context, panel) {
       await interaction.deferUpdate();
       return showCandidates(interaction,user,{ request, browsing:false, page:1 });
     }
-    if (['refresh','browse'].includes(action) && isButton(interaction) && flow.stage === 'candidates') {
+    if (action === 'link-member' && interaction.isUserSelectMenu?.() && flow.stage === 'link-member') {
+      const discordId = interaction.values?.[0];
+      if (!/^[1-9][0-9]{16,19}$/.test(discordId || '')) throw new Error('This selection is invalid.');
+      context.services.playerLinks.assertUnlinked(discordId);
+      const existing = await context.services.playerNames.findRequest(discordId);
+      flows.delete(token);
+      await interaction.deferUpdate();
+      return showCandidates(interaction,user,existing ? { request:existing, browsing:false, page:1 }
+        : { request:{ discordId, playerName:null }, browsing:true, page:1 });
+    }
+    if (['refresh','browse'].includes(action) && isButton(interaction) && flow.stage === 'candidates'
+      && (action === 'refresh' || flow.request.playerName)) {
       flows.delete(token);
       await interaction.deferUpdate();
       return showCandidates(interaction,user,{ ...flow, browsing:action === 'browse' ? !flow.browsing : flow.browsing, page:1 });
@@ -137,7 +153,7 @@ function createNameLinkRouter(context, panel) {
       const linked = await context.services.playerLinks.link({ discordId:flow.request.discordId,
         eosId:player.eosId, displayName:player.displayName, manual:player.manual === true,
         source:player.manual ? 'manual' : `observed:${player.serverId}`, actorId:user.actorId,
-        request:flow.request, expiresAt:flow.expiresAt });
+        request:flow.request.playerName ? flow.request : null, expiresAt:flow.expiresAt });
       context.client.emit('v2PlayerNamesChanged');
       context.client.emit('v2VaultPinsChanged');
       return interaction.editReply({ content:`Linked in-game identity for <@${flow.request.discordId}>: **${views.safe(linked.displayName)}**.`,

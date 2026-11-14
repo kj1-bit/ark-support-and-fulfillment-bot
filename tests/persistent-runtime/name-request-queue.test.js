@@ -147,6 +147,29 @@ test('renamed linked EOS remains owned while another player submits and links it
   assert.equal(online.resolve(result.players[1].playerRef,context).eosId,eos(2));
 });
 
+test('linking a member without a request verifies a new name entry and rejects conflicting names or new requests', async t => {
+  const s = await setup(t);
+  const direct = { eosId:eos(1),displayName:'Mud',source:'observed:map',actorId:id(9),request:null };
+  await s.service.submit({ discordId:id(2),playerName:'mud' });
+  await assert.rejects(() => s.links.link({ ...direct,discordId:id(1) }),{ code:'NAME_REQUESTED' });
+  assert.equal(s.players.byDiscord(id(1)),null);
+  await s.service.submit({ discordId:id(3),playerName:'Other' });
+  await assert.rejects(() => s.links.link({ ...direct,discordId:id(3),displayName:'Fresh' }),{ code:'REQUEST_CHANGED' });
+  assert.equal((await s.names.findByDiscord(id(3))).status,'PENDING');
+  await assert.rejects(() => s.links.link({ ...direct,discordId:id(1),request:undefined,displayName:'Fresh' }),{ code:'REQUEST_CHANGED' });
+  await s.links.link({ ...direct,discordId:id(1),displayName:'Fresh' });
+  const name = await s.names.findByDiscord(id(1));
+  assert.equal(name.playerName,'Fresh');
+  assert.equal(name.status,'VERIFIED');
+  assert.equal(name.moderatorId,id(9));
+  assert.equal(name.verifiedAt,100);
+  assert.equal(s.players.byDiscord(id(1)).eosId,eos(1));
+  assert.equal((await s.db.get('SELECT eos_id FROM trusted_players WHERE discord_id=?',[id(1)])).eos_id,eos(1));
+  assert(!(await s.names.queue()).results.some(result => result.discordId === id(1)));
+  await s.links.unlink({ discordId:id(1),eosId:eos(1),actorId:id(9) });
+  assert.equal((await s.names.findByDiscord(id(1))).status,'PENDING');
+});
+
 test('stale requests and simultaneous attempts cannot link an EOS twice or mutate the losing name', async t => {
   const s = await setup(t);
   const first = await s.service.submit({ discordId:id(1),playerName:'First Name' });

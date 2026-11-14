@@ -27,7 +27,10 @@ function createSqlitePlayerRepository(database) {
             AND NOT EXISTS (SELECT 1 FROM trusted_players WHERE discord_id=?)`,
           [moderatorId,r.verifiedAt,r.verifiedAt,r.discordId,request.playerName,request.updatedAt,r.discordId]);
         } else {
-          const taken = await database.get('SELECT discord_id AS discordId FROM player_names WHERE player_name=? COLLATE NOCASE', [r.displayName]);
+          const taken = await database.get(`SELECT p.discord_id AS discordId FROM player_names p
+            WHERE p.player_name=? COLLATE NOCASE AND p.discord_id<>?
+            AND NOT EXISTS (SELECT 1 FROM trusted_players t WHERE t.discord_id=p.discord_id)`,
+          [r.displayName,r.discordId]);
           if (taken && taken.discordId !== r.discordId) {
             throw Object.assign(new Error('This in-game name is already requested by another Discord member.'), { code:'NAME_REQUESTED' });
           }

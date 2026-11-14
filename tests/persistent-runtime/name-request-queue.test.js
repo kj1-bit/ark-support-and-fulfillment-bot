@@ -170,6 +170,20 @@ test('linking a member without a request verifies a new name entry and rejects c
   assert.equal((await s.names.findByDiscord(id(1))).status,'PENDING');
 });
 
+test('direct linking ignores a matching name belonging only to an already-linked member', async t => {
+  const s = await setup(t);
+  const request = await s.service.submit({ discordId:id(1),playerName:'Old Name' });
+  await s.links.link({ discordId:id(1),eosId:eos(1),displayName:'Old Name',
+    source:'manual',actorId:id(9),request });
+
+  await s.links.link({ discordId:id(2),eosId:eos(2),displayName:'Old Name',
+    source:'observed:map',actorId:id(9),request:null });
+
+  assert.equal((await s.names.findByDiscord(id(2))).status,'VERIFIED');
+  assert.equal(s.players.byDiscord(id(2)).eosId,eos(2));
+  assert.equal((await s.db.get('SELECT eos_id FROM trusted_players WHERE discord_id=?',[id(2)])).eos_id,eos(2));
+});
+
 test('stale requests and simultaneous attempts cannot link an EOS twice or mutate the losing name', async t => {
   const s = await setup(t);
   const first = await s.service.submit({ discordId:id(1),playerName:'First Name' });

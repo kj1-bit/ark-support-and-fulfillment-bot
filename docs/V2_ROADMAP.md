@@ -327,11 +327,11 @@ Exit criteria:
 
 ## Phase 11: Staged rollout
 
-- [ ] Deploy to the test environment.
-- [ ] Run Discord workflows in mock mode.
-- [ ] Validate a no-network mock-mode run.
-- [ ] Test catalog validation, activation, rejection, and rollback with non-production data.
-- [ ] Run controlled live RCON tests on the approved test server.
+- [x] Deploy to the test environment.
+- [x] Run Discord workflows in mock mode.
+- [x] Validate a no-network mock-mode run.
+- [x] Test catalog validation, activation, rejection, and rollback with non-production data.
+- [x] Run controlled live RCON tests on the approved test server.
 - [ ] Verify authorization and failure behavior.
 - [ ] Verify database backup and restoration.
 - [ ] Exercise the release rollback procedure.
@@ -371,9 +371,9 @@ V2 must preserve or deliberately migrate these workflows:
 - Catalog version tracking and known-good rollback
 - DLC metadata and warnings
 - Dino fulfillment confirmation
-- Mock-mode testing
-- Live RCON fulfillment
-- AAT cryopod delivery
+- Mock-mode testing — complete
+- Live RCON fulfillment — complete
+- AAT cryopod delivery — complete
 - SQLite-backed persistence
 - Paginated operational dashboards
 
@@ -416,7 +416,7 @@ A creature catalog update is acceptable only when:
 - A scheduled retention service purges expired sessions, old tickets, completed PIN requests, operational events, and old fulfillment audit rows, and anonymizes terminal fulfillment identities. Expired PIN requests no longer block re-requesting, and interrupted fulfillment is reconciled on startup.
 - Enabled PINs require `PIN_PROTECTION_KEY` during configuration validation outside mock mode; the launcher also requires a valid key in every mode before opening SQLite.
 - Schema version 11 adds `CHECK` constraints for fulfillment, interaction-session, and catalog states (rebuilt after verifying existing rows) and removes the unused `trusted_identity_associations` table from migration 008 (non-empty tables are archived, never dropped). `trusted_players` is the only trusted-identity table. The migration runner requires recorded history to be a contiguous prefix of this release's migrations with matching names. Malformed persisted fulfillment result JSON no longer prevents a request from loading (`results` is omitted and `resultsCorrupt` is set).
-- `scripts/start-v2.js` wires the runtime to SQLite, the content-fingerprinted checked-in catalog, the Discord adapter, and the mode-specific RCON transport. Mock-mode launcher integration is tested; no Debian or external test-service deployment has been performed.
+- `scripts/start-v2.js` wires the runtime to SQLite, the content-fingerprinted checked-in catalog, the Discord adapter, and the mode-specific RCON transport. Mock-mode launcher integration is tested; V2 has been rehearsed on Debian and deployed against external test endpoints.
 
 ### Verification
 

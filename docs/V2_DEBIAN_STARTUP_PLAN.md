@@ -2,7 +2,7 @@
 
 This plan describes an **isolated V2 test deployment**. The repository now includes a V2 executable at `scripts/start-v2.js`, exposed as `npm run start:v2`. It wires SQLite, Discord, the checked-in creature catalog, the configured RCON transport, backups, audit logging, and signal-driven shutdown. The root `index.js` still starts V1; never use it to start V2.
 
-The launcher has mock-mode startup coverage, but has not been rehearsed on Debian or against a test Discord application and ARK server. Follow these stages only with separate test resources. This is not authorization to connect to production Discord, live RCON, or V1 data.
+V2 has been rehearsed on Debian and tested against a test Discord application and ARK server. Follow these stages only with separate test resources. This is not authorization to connect to production Discord, live RCON, or V1 data.
 
 ## Repository path map
 

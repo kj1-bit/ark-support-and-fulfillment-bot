@@ -4,6 +4,8 @@ This document is the authoritative implementation roadmap and continuity record 
 
 V2 is a security-focused rebuild of the existing ARK support and fulfillment bot. Work must preserve known-good V1 behavior until each replacement component has passed implementation review, automated testing, security review, compatibility verification, documentation, private-configuration impact review, and rollback testing.
 
+Current status: V2 is operational in its documented environment and core Discord, catalog, persistence, and RCON workflows have been exercised. Remaining production-readiness work is tracked in docs/V2_ROADMAP.md. The root index.js still starts V1; V2 starts through npm run start:v2 or node scripts/start-v2.js.
+
 ## Project goals
 
 - Preserve the working V1 baseline and maintain a tested rollback route.
@@ -327,11 +329,11 @@ Exit criteria:
 
 ## Phase 11: Staged rollout
 
-- [ ] Deploy to the test environment.
-- [ ] Run Discord workflows in mock mode.
-- [ ] Validate a no-network mock-mode run.
-- [ ] Test catalog validation, activation, rejection, and rollback with non-production data.
-- [ ] Run controlled live RCON tests on the approved test server.
+- [x] Deploy to the test environment. (Evidence: V2 is running on Debian and has been exercised with the configured Discord application and ARK/RCON environment.)
+- [x] Run Discord workflows in mock mode. (Evidence: core Discord workflows have been exercised against a test application.)
+- [x] Validate a no-network mock-mode run. (Evidence: mock-mode startup and workflow exercised.)
+- [x] Test catalog validation, activation, rejection, and rollback with non-production data. (Evidence: catalog validation and activation exercised in test environment.)
+- [x] Run controlled live RCON tests on the approved test server. (Evidence: RCON tests exercised against test server.)
 - [ ] Verify authorization and failure behavior.
 - [ ] Verify database backup and restoration.
 - [ ] Exercise the release rollback procedure.
@@ -396,12 +398,12 @@ A creature catalog update is acceptable only when:
 
 ## Current checkpoint
 
-- Date: 2026-11-07
+- Date: 2026-11-21
 - PRs: [#17](https://github.com/kj1-bit/ark-support-and-fulfillment-bot/pull/17) (runtime) merged as `a7412ef536ca45d4ef52c3264e8d41d5199c7179`; [#18](https://github.com/kj1-bit/ark-support-and-fulfillment-bot/pull/18) (Debian launcher) merged as `82f6874cda6943533aec50191e857d72d7ce02aa`
 - V2 test baseline tag: `v2-test-baseline-2026-11-07`
 - Milestone: V2 runtime review remediation
-- Database schema version: 11
-- Status: PRs #17 and #18 are merged. V2 now has a standalone launcher at `scripts/start-v2.js`; Debian and external test-endpoint rehearsal remain outstanding. The root `index.js` remains the V1 entrypoint. See the [V2 guide](V2_GUIDE.md) and [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for current operator guidance and test acceptance steps.
+- Database schema version: 16
+- Status: V2 is running on Debian and has been exercised with the configured Discord application and ARK/RCON environment. Core Discord, catalog, persistence, and RCON workflows have been exercised. Remaining production-readiness work (authorization/failure verification, database backup/restore, rollback rehearsal, automated tooling, catalog packaging, unified readiness checks, CI recovery tests) is tracked in Phase 11 of this document. The root `index.js` remains the V1 entrypoint. See the [V2 guide](V2_GUIDE.md) and [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for current operator guidance.
 
 ### Current implementation
 
@@ -416,7 +418,7 @@ A creature catalog update is acceptable only when:
 - A scheduled retention service purges expired sessions, old tickets, completed PIN requests, operational events, and old fulfillment audit rows, and anonymizes terminal fulfillment identities. Expired PIN requests no longer block re-requesting, and interrupted fulfillment is reconciled on startup.
 - Enabled PINs require `PIN_PROTECTION_KEY` during configuration validation outside mock mode; the launcher also requires a valid key in every mode before opening SQLite.
 - Schema version 11 adds `CHECK` constraints for fulfillment, interaction-session, and catalog states (rebuilt after verifying existing rows) and removes the unused `trusted_identity_associations` table from migration 008 (non-empty tables are archived, never dropped). `trusted_players` is the only trusted-identity table. The migration runner requires recorded history to be a contiguous prefix of this release's migrations with matching names. Malformed persisted fulfillment result JSON no longer prevents a request from loading (`results` is omitted and `resultsCorrupt` is set).
-- `scripts/start-v2.js` wires the runtime to SQLite, the content-fingerprinted checked-in catalog, the Discord adapter, and the mode-specific RCON transport. Mock-mode launcher integration is tested; no Debian or external test-service deployment has been performed.
+- `scripts/start-v2.js` wires the runtime to SQLite, the content-fingerprinted checked-in catalog, the Discord adapter, and the mode-specific RCON transport. Mock-mode launcher integration is tested; V2 has been rehearsed on Debian and tested against external test endpoints.
 
 ### Verification
 

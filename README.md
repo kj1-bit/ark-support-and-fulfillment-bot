@@ -2,7 +2,7 @@
 
 Ticketbot is a Discord support and operations bot for ARK: Survival Ascended communities. The repository contains the original V1 application and a newer, security-focused V2 runtime.
 
-> **Important:** V2 now has a standalone launcher (`npm run start:v2` / `node scripts/start-v2.js`) with SQLite, Discord, catalog, and RCON wiring. It has focused mock-mode startup coverage, but has not yet been rehearsed on Debian or against a test Discord application and ARK server. `index.js` still starts V1. Do not connect V2 to production or treat command registration as part of startup. Follow the [V2 guide](docs/V2_GUIDE.md) and [Debian startup plan](docs/V2_DEBIAN_STARTUP_PLAN.md) for isolated staging.
+> **Note:** V2 is running on Debian and has been exercised with the configured Discord application and ARK/RCON environment. Core Discord, catalog, persistence, and RCON workflows have been exercised. Remaining production-readiness work is tracked in [docs/V2_ROADMAP.md](docs/V2_ROADMAP.md). `index.js` still starts V1; V2 starts through `npm run start:v2` or `node scripts/start-v2.js`.
 
 ## Documentation
 

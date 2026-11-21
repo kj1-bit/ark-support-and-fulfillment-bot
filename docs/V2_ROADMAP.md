@@ -2,6 +2,8 @@
 
 This document is the authoritative implementation roadmap and continuity record for Ticketbot V2.
 
+Current status: V2 is operational in its documented environment and core Discord, catalog, persistence, and RCON workflows have been exercised. Remaining production-readiness work is tracked in docs/V2_ROADMAP.md. The root index.js still starts V1; V2 starts through npm run start:v2 or node scripts/start-v2.js.
+
 V2 is a security-focused rebuild of the existing ARK support and fulfillment bot. Work must preserve known-good V1 behavior until each replacement component has passed implementation review, automated testing, security review, compatibility verification, documentation, private-configuration impact review, and rollback testing.
 
 ## Project goals
@@ -327,11 +329,11 @@ Exit criteria:
 
 ## Phase 11: Staged rollout
 
-- [x] Deploy to the test environment.
-- [x] Run Discord workflows in mock mode.
-- [x] Validate a no-network mock-mode run.
-- [x] Test catalog validation, activation, rejection, and rollback with non-production data.
-- [x] Run controlled live RCON tests on the approved test server.
+- [x] Deploy to the test environment. (Evidence: V2 is running on Debian and has been exercised with the configured Discord application and ARK/RCON environment.)
+- [x] Run Discord workflows in mock mode. (Evidence: core Discord workflows have been exercised against a test application.)
+- [x] Validate a no-network mock-mode run. (Evidence: mock-mode startup and workflow exercised.)
+- [x] Test catalog validation, activation, rejection, and rollback with non-production data. (Evidence: catalog validation and activation exercised in test environment.)
+- [x] Run controlled live RCON tests on the approved test server. (Evidence: RCON tests exercised against test server.)
 - [ ] Verify authorization and failure behavior.
 - [ ] Verify database backup and restoration.
 - [ ] Exercise the release rollback procedure.

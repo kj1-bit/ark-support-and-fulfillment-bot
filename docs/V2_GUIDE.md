@@ -2,15 +2,17 @@
 
 This guide explains what V2 is designed to do, how its configuration is organized, how each feature behaves, and how it was deployed and tested.
 
+Current status: V2 is operational in its documented environment and core Discord, catalog, persistence, and RCON workflows have been exercised. Remaining production-readiness work is tracked in docs/V2_ROADMAP.md. The root index.js still starts V1; V2 starts through npm run start:v2 or node scripts/start-v2.js.
+
 ## First: understand the current status
 
 V2's validated configuration, service composition, feature handlers, SQLite repositories and migrations, Discord interaction flows, retention, launcher, and tests are in the repository. The standalone launcher is `npm run start:v2` (or `node scripts/start-v2.js`):
 
 - The root `index.js` still starts the existing V1 application.
 - The launcher wires the SQLite database, validated catalog, Discord client, configured RCON transport, fulfillment command builder, backup provider, audit sink, and graceful signal shutdown into `src/composition/start-v2.js`.
-- V2 is live and fully tested on Debian against a test Discord application and ARK server.
+- V2 has been exercised against a test Discord application and ARK server. Remaining production-readiness work is tracked in [V2_ROADMAP.md](V2_ROADMAP.md).
 
-V2 is live and connected to its production Discord application and ARK server. The example configuration is for learning and validation, not a ready-to-run production instance. A merge of V2 code does not activate V2, change V1, register Discord commands, or migrate any database.
+Do not point V2 at production Discord, live RCON, or a V1 database. The example configuration is for learning and validation, not a ready-to-run production instance. A merge of V2 code does not activate V2, change V1, register Discord commands, or migrate any database.
 
 If you need to run the currently supported application, use the [V1 setup guide](SETUP.md). The [roadmap](V2_ROADMAP.md) tracks remaining V2 work.
 

@@ -2,6 +2,8 @@
 
 Discord interactions must never start deployment, execute operating-system commands, select scripts, or restart the bot. Deployment is an operator-controlled host action performed outside the Discord process.
 
+Current status: V2 is operational in its documented environment and core Discord, catalog, persistence, and RCON workflows have been exercised. Remaining production-readiness work is tracked in docs/V2_ROADMAP.md. The root index.js still starts V1; V2 starts through npm run start:v2 or node scripts/start-v2.js.
+
 ## Security boundary
 
 - `/updatebot` is removed from command registration and runtime handling.

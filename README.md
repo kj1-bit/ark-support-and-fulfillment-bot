@@ -2,7 +2,7 @@
 
 Ticketbot is a Discord support and operations bot for ARK: Survival Ascended communities. The repository contains the original V1 application and a newer, security-focused V2 runtime.
 
-> **Important:** V2 now has a standalone launcher (`npm run start:v2` / `node scripts/start-v2.js`) with SQLite, Discord, catalog, and RCON wiring. It has focused mock-mode startup coverage, but has not yet been rehearsed on Debian or against a test Discord application and ARK server. `index.js` still starts V1. Do not connect V2 to production or treat command registration as part of startup. Follow the [V2 guide](docs/V2_GUIDE.md) and [Debian startup plan](docs/V2_DEBIAN_STARTUP_PLAN.md) for isolated staging.
+> **Note:** V2 is running on Debian and has been exercised with the configured Discord application and ARK/RCON environment. Core Discord, catalog, SQLite runtime persistence, and RCON workflows have been exercised. Database backup and restoration verification remains incomplete. Remaining production-readiness work is tracked in [docs/V2_ROADMAP.md](docs/V2_ROADMAP.md). The root `index.js` still starts V1; V2 starts through `npm run start:v2` or `node scripts/start-v2.js`.
 
 ## Documentation
 
@@ -27,7 +27,7 @@ V2 is designed around validated configuration, feature-specific authorization, p
 - Persistent, paginated staff log panels
 - Expiration cleanup and recovery of interrupted fulfillment
 
-The feature list describes implemented V2 source, not a production-ready deployment. Before any V2 test launch, stage the launcher in a separate environment and complete the test checklist. Merging source does not activate V2, migrate the V1 production database, change Discord commands, or stop V1.
+The feature list describes implemented V2 source. Core Discord, catalog, persistence, and RCON workflows have been exercised in its documented environment. Remaining production-readiness work is tracked in [docs/V2_ROADMAP.md](docs/V2_ROADMAP.md). Merging source does not activate V2, migrate the V1 production database, change Discord commands, or stop V1.
 
 ## Existing V1 application
 

@@ -2,6 +2,8 @@
 
 Discord interactions must never start deployment, execute operating-system commands, select scripts, or restart the bot. Deployment is an operator-controlled host action performed outside the Discord process.
 
+Current status: V2 is operational in its documented environment and core Discord, catalog, SQLite runtime persistence, and RCON workflows have been exercised. Database backup and restoration verification remains incomplete. Remaining production-readiness work is tracked in [docs/V2_ROADMAP.md](docs/V2_ROADMAP.md). The root `index.js` still starts V1; V2 starts through `npm run start:v2` or `node scripts/start-v2.js`.
+
 ## Security boundary
 
 - `/updatebot` is removed from command registration and runtime handling.
@@ -60,7 +62,7 @@ Retention and cleanup are configured with the optional `retention` section and d
 
 The V2 runtime migration keeps the legacy V1 ticket table intact by renaming it to `tickets_v1_legacy` before creating the V2 `tickets` table; if that archive name is already occupied, migration fails and rolls back without changing ticket data. This preserves legacy ticket data but does not make V1 able to use the migrated database. Keep the pre-migration backup until the updated runtime and historical ticket data have been verified. A rollback to V1 must restore that backup before starting V1 because its handlers expect the original `tickets` table shape.
 
-The standalone V2 entrypoint is `node scripts/start-v2.js` or `npm run start:v2`. It reads `TICKETBOT_CONFIG_PATH` (or the default ignored local config), and starts the composed SQLite/Discord/RCON runtime. See the [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for an isolated test service example. The launcher has mock-mode startup coverage; it has not been rehearsed on Debian or against external test endpoints. Do not treat it as production-accepted.
+The standalone V2 entrypoint is `node scripts/start-v2.js` or `npm run start:v2`. It reads `TICKETBOT_CONFIG_PATH` (or the default ignored local config), and starts the composed SQLite/Discord/RCON runtime. See the [Debian startup plan](V2_DEBIAN_STARTUP_PLAN.md) for an isolated test service example. V2 has been rehearsed on Debian and tested against a test Discord application and ARK server.
 
 ## Catalog startup and intentional rollback
 

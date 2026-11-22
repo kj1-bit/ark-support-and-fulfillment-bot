@@ -1,6 +1,8 @@
 # Ticketbot V2 guide
 
-This guide explains what V2 is designed to do, how its configuration is organized, how each feature behaves, and what must be ready before an isolated test deployment.
+This guide explains what V2 is designed to do, how its configuration is organized, how each feature behaves, and how it was deployed and tested.
+
+Current status: V2 is operational in its documented environment and core Discord, catalog, SQLite runtime persistence, and RCON workflows have been exercised. Database backup and restoration verification remains incomplete. Remaining production-readiness work is tracked in [docs/V2_ROADMAP.md](docs/V2_ROADMAP.md). The root `index.js` still starts V1; V2 starts through `npm run start:v2` or `node scripts/start-v2.js`.
 
 ## First: understand the current status
 
@@ -8,7 +10,7 @@ V2's validated configuration, service composition, feature handlers, SQLite repo
 
 - The root `index.js` still starts the existing V1 application.
 - The launcher wires the SQLite database, validated catalog, Discord client, configured RCON transport, fulfillment command builder, backup provider, audit sink, and graceful signal shutdown into `src/composition/start-v2.js`.
-- The launcher has focused mock-mode tests, but it has not been rehearsed on Debian or against a test Discord application and ARK server. Treat test/production connectivity and operational acceptance as unverified until the isolated test checklist is completed.
+- V2 has been exercised against a test Discord application and ARK server. Remaining production-readiness work is tracked in [V2_ROADMAP.md](V2_ROADMAP.md).
 
 Do not point V2 at production Discord, live RCON, or a V1 database. The example configuration is for learning and validation, not a ready-to-run production instance. A merge of V2 code does not activate V2, change V1, register Discord commands, or migrate any database.
 
